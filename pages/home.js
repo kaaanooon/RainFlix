@@ -179,14 +179,14 @@
 
     carousel.innerHTML = `
       <div class="relative h-full overflow-hidden">
-        <div class="absolute left-0 right-0 top-0 z-30 h-1 bg-blue-950/80">
+        <div class="absolute left-0 right-0 top-0 z-10 h-1 bg-blue-950/80">
           <div class="h-full bg-sky-400 ${state.carouselChanging ? "w-full animate-pulse" : "rainflix-progress"}"></div>
         </div>
 
         ${carouselSlideTemplate(item, currentClass)}
         ${state.carouselChanging ? carouselSlideTemplate(pendingItem, nextClass) : ""}
 
-        <div class="absolute left-8 top-8 z-30 flex gap-2">
+        <div class="absolute left-8 top-8 z-10 flex gap-2">
           ${state.carouselItems
             .map(
               (_, index) => `

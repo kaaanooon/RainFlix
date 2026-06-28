@@ -69,32 +69,34 @@
     }
 
     setDropdownContent(
-      `${results
-        .map((item) => {
-          const image = item.poster || item.backdrop || imageFallback(item.title);
-          const url = window.RainFlixApi.buildWatchUrl(item);
+      `<div class="max-h-[22rem] overflow-y-auto">
+        ${results
+          .map((item) => {
+            const image = item.poster || item.backdrop || imageFallback(item.title);
+            const url = window.RainFlixApi.buildWatchUrl(item);
 
-          return `
-            <a
-              class="flex gap-3 border-b border-blue-950/70 p-3 text-left transition last:border-b-0 hover:bg-sky-400/10 focus-visible:bg-sky-400/10 focus-visible:outline-none"
-              href="${url}"
-              role="option"
-            >
-              <img
-                class="h-16 w-11 shrink-0 rounded object-cover"
-                src="${image}"
-                alt=""
-                loading="lazy"
-                onerror="this.onerror=null;this.src='${imageFallback(item.title)}';"
-              />
-              <span class="min-w-0 pt-1">
-                <span class="block truncate text-sm font-bold text-slate-100">${escapeHtml(item.title)}</span>
-                <span class="mt-1 block text-xs text-slate-400">${window.RainFlixApi.mediaLabel(item.mediaType)} &middot; ${escapeHtml(item.year)} &middot; ${escapeHtml(item.rating)}</span>
-              </span>
-            </a>
-          `;
-        })
-        .join("")}${
+            return `
+              <a
+                class="flex min-h-[5.5rem] gap-3 border-b border-blue-950/70 p-3 text-left transition last:border-b-0 hover:bg-sky-400/10 focus-visible:bg-sky-400/10 focus-visible:outline-none"
+                href="${url}"
+                role="option"
+              >
+                <img
+                  class="h-16 w-11 shrink-0 rounded object-cover"
+                  src="${image}"
+                  alt=""
+                  loading="lazy"
+                  onerror="this.onerror=null;this.src='${imageFallback(item.title)}';"
+                />
+                <span class="min-w-0 pt-1">
+                  <span class="block truncate text-sm font-bold text-slate-100">${escapeHtml(item.title)}</span>
+                  <span class="mt-1 block text-xs text-slate-400">${window.RainFlixApi.mediaLabel(item.mediaType)} &middot; ${escapeHtml(item.year)} &middot; ${escapeHtml(item.rating)}</span>
+                </span>
+              </a>
+            `;
+          })
+          .join("")}
+      </div>${
         window.RainFlixApi.hasTmdbCredentials()
           ? ""
           : '<div class="border-t border-blue-950/70 px-4 py-3 text-xs text-slate-500">Full TMDb search activates after adding credentials in scripts/config.js.</div>'
