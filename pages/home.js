@@ -1,6 +1,13 @@
 (function () {
   const state = {
     activeSlide: 0,
+    browseBuffer: [],
+    browseHasMore: true,
+    browseItems: [],
+    browseLoading: false,
+    browseNextPage: 2,
+    browseObserver: null,
+    browseTotalPages: null,
     carouselChanging: false,
     carouselItems: [],
     carouselTimer: null,
@@ -12,6 +19,8 @@
     trending: [],
   };
 
+  const BROWSE_ROWS_PER_BATCH = 5;
+
   function api() {
     return window.RainFlixApi;
   }
@@ -22,6 +31,38 @@
 
   function imageFallback(title, wide = false) {
     return api().createImageFallback(title, wide);
+  }
+
+  function browseColumnCount() {
+    if (window.matchMedia("(min-width: 768px)").matches) {
+      return 5;
+    }
+
+    if (window.matchMedia("(min-width: 640px)").matches) {
+      return 3;
+    }
+
+    return 2;
+  }
+
+  function browseBatchSize() {
+    return browseColumnCount() * BROWSE_ROWS_PER_BATCH;
+  }
+
+  function ghostCardTemplate() {
+    return `
+      <div class="overflow-hidden rounded-lg border border-blue-900/60 bg-slate-950 shadow-xl shadow-black/20" aria-hidden="true">
+        <div class="aspect-[2/3] animate-pulse bg-blue-950/40"></div>
+        <div class="space-y-2 p-3">
+          <div class="h-4 w-4/5 animate-pulse rounded bg-blue-950/70"></div>
+          <div class="flex gap-2">
+            <div class="h-6 w-12 animate-pulse rounded-full bg-blue-950/60"></div>
+            <div class="h-6 w-10 animate-pulse rounded-full bg-blue-950/50"></div>
+            <div class="h-6 w-16 animate-pulse rounded-full bg-blue-950/50"></div>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function renderSkeleton(selector) {
@@ -36,6 +77,18 @@
     )).join("");
   }
 
+  function setSectionVisible(selector, isVisible) {
+    document.querySelector(selector)?.classList.toggle("hidden", !isVisible);
+  }
+
+  function setText(selector, text) {
+    const element = document.querySelector(selector);
+
+    if (element) {
+      element.textContent = text;
+    }
+  }
+
   function renderFeedMeta() {
     const meta = document.querySelector("#feedMeta");
 
@@ -44,7 +97,7 @@
     }
 
     meta.textContent = state.sources.has("tmdb")
-      ? "Live TMDb feeds. Each section shows up to 10 titles."
+      ? "Live TMDb feeds. Browse loads five rows at a time."
       : "Demo feeds shown. Add TMDb credentials in scripts/config.js for live TMDb results.";
   }
 
@@ -54,33 +107,33 @@
 
     return `
       <a
-        class="group relative isolate aspect-[2/3] overflow-hidden rounded-lg border border-blue-900/70 bg-slate-950 shadow-xl shadow-black/30 outline-none transition hover:-translate-y-1 hover:border-sky-500/70 focus-visible:-translate-y-1 focus-visible:border-sky-500/70 focus-visible:ring-4 focus-visible:ring-sky-400/20"
+        class="group block overflow-hidden rounded-lg border border-blue-900/70 bg-slate-950 shadow-xl shadow-black/30 outline-none transition hover:-translate-y-1 hover:border-sky-500/70 focus-visible:-translate-y-1 focus-visible:border-sky-500/70 focus-visible:ring-4 focus-visible:ring-sky-400/20"
         href="${watchUrl}"
         aria-label="Watch ${escapeHtml(item.title)}"
       >
-        <img
-          class="h-full w-full object-cover transition duration-300 group-hover:scale-105 group-hover:brightness-[0.58] group-focus-visible:scale-105 group-focus-visible:brightness-[0.58]"
-          src="${poster}"
-          alt="${escapeHtml(item.title)} poster"
-          loading="lazy"
-          decoding="async"
-          onerror="this.onerror=null;this.src='${imageFallback(item.title)}';"
-        />
+        <div class="relative isolate aspect-[2/3] overflow-hidden">
+          <img
+            class="h-full w-full object-cover transition duration-300 group-hover:scale-105 group-hover:brightness-[0.58] group-focus-visible:scale-105 group-focus-visible:brightness-[0.58]"
+            src="${poster}"
+            alt="${escapeHtml(item.title)} poster"
+            loading="lazy"
+            decoding="async"
+            onerror="this.onerror=null;this.src='${imageFallback(item.title)}';"
+          />
 
-        <div class="absolute inset-0 flex translate-y-3 flex-col justify-end gap-3 bg-gradient-to-t from-slate-950 via-slate-950/78 to-transparent p-4 opacity-0 transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">
+          <div class="absolute inset-0 flex translate-y-3 flex-col justify-end gap-3 bg-gradient-to-t from-slate-950 via-slate-950/78 to-transparent p-4 opacity-0 transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">
+            <h3 class="text-xl font-black leading-tight text-slate-50">${escapeHtml(item.title)}</h3>
+            <p class="line-clamp-3 text-xs leading-5 text-slate-300 md:line-clamp-4 md:text-sm md:leading-6">${escapeHtml(item.synopsis)}</p>
+          </div>
+        </div>
+
+        <div class="space-y-2 p-3">
+          <h3 class="truncate text-sm font-black text-slate-50">${escapeHtml(item.title)}</h3>
           <div class="flex flex-wrap items-center gap-2 text-xs text-slate-300">
-            <span class="rounded-full bg-sky-400/15 px-2 py-1 font-black uppercase text-sky-300">${api().mediaLabel(item.mediaType)}</span>
-            <span>${escapeHtml(item.year)}</span>
-          </div>
-
-          <h3 class="text-xl font-black leading-tight text-slate-50">${escapeHtml(item.title)}</h3>
-
-          <div class="flex flex-wrap items-center gap-2 text-xs text-slate-300" aria-label="Rating ${escapeHtml(item.rating)}">
             <span class="rounded-full bg-blue-500/20 px-2 py-1 font-black text-sky-200">${escapeHtml(item.rating)}</span>
-            <span>Rating</span>
+            <span>${escapeHtml(item.year)}</span>
+            <span class="rounded-full bg-sky-400/15 px-2 py-1 font-black uppercase text-sky-300">${api().mediaLabel(item.mediaType)}</span>
           </div>
-
-          <p class="line-clamp-3 text-xs leading-5 text-slate-300 md:line-clamp-4 md:text-sm md:leading-6">${escapeHtml(item.synopsis)}</p>
         </div>
       </a>
     `;
@@ -105,6 +158,148 @@
     grid.innerHTML = items.slice(0, api().PAGE_SIZE).map(cardTemplate).join("");
   }
 
+  function browseItemKey(item) {
+    return `${item.mediaType}:${item.id}`;
+  }
+
+  function resetBrowseState() {
+    state.browseBuffer = [];
+    state.browseHasMore = true;
+    state.browseItems = [];
+    state.browseLoading = false;
+    state.browseNextPage = 1;
+    state.browseTotalPages = null;
+  }
+
+  function renderBrowseGrid(ghostCount = 0) {
+    const grid = document.querySelector("#browseGrid");
+    const sentinel = document.querySelector("#browseSentinel");
+
+    if (!grid) {
+      return;
+    }
+
+    grid.setAttribute("aria-busy", state.browseLoading ? "true" : "false");
+
+    if (!state.browseItems.length && !ghostCount) {
+      grid.innerHTML = `
+        <p class="col-span-full rounded-lg border border-blue-900/70 bg-blue-950/30 p-7 text-slate-400">
+          No browse titles found.
+        </p>
+      `;
+    } else {
+      grid.innerHTML = [
+        ...state.browseItems.map(cardTemplate),
+        ...Array.from({ length: ghostCount }, ghostCardTemplate),
+      ].join("");
+    }
+
+    sentinel?.classList.toggle("hidden", !state.browseHasMore);
+  }
+
+  async function fetchBrowseBatch(targetCount) {
+    const results = [];
+    const loadedKeys = new Set(state.browseItems.map(browseItemKey));
+
+    while (results.length < targetCount && state.browseHasMore) {
+      while (state.browseBuffer.length && results.length < targetCount) {
+        const item = state.browseBuffer.shift();
+        const key = browseItemKey(item);
+
+        if (!loadedKeys.has(key)) {
+          loadedKeys.add(key);
+          results.push(item);
+        }
+      }
+
+      if (results.length >= targetCount || !state.browseHasMore) {
+        break;
+      }
+
+      if (
+        !state.browseBuffer.length &&
+        state.browseTotalPages &&
+        state.browseNextPage > state.browseTotalPages
+      ) {
+        state.browseHasMore = false;
+        break;
+      }
+
+      const feed = await api().getTrending({
+        filter: "all",
+        page: state.browseNextPage,
+        limit: 20,
+      });
+      const items = feed.items || [];
+
+      if (feed.source) {
+        state.sources.add(feed.source);
+      }
+
+      state.browseNextPage += 1;
+      state.browseTotalPages = feed.totalPages || state.browseTotalPages;
+
+      if (!items.length) {
+        state.browseHasMore = false;
+        break;
+      }
+
+      state.browseBuffer.push(...items);
+
+      if (feed.totalPages && state.browseNextPage > feed.totalPages) {
+        state.browseHasMore = state.browseBuffer.length > 0;
+      }
+    }
+
+    return results;
+  }
+
+  async function loadMoreBrowseItems() {
+    if (state.browseLoading || !state.browseHasMore) {
+      return;
+    }
+
+    state.browseLoading = true;
+    const targetCount = browseBatchSize();
+    renderBrowseGrid(targetCount);
+
+    try {
+      const nextItems = await fetchBrowseBatch(targetCount);
+      state.browseItems.push(...nextItems);
+
+      if (nextItems.length < targetCount && !state.browseBuffer.length) {
+        state.browseHasMore = false;
+      }
+    } catch (error) {
+      console.warn(error);
+      state.browseHasMore = false;
+    } finally {
+      state.browseLoading = false;
+      renderBrowseGrid();
+      renderFeedMeta();
+    }
+  }
+
+  function setupBrowseObserver() {
+    state.browseObserver?.disconnect();
+
+    const sentinel = document.querySelector("#browseSentinel");
+
+    if (!sentinel || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    state.browseObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadMoreBrowseItems();
+        }
+      },
+      { rootMargin: "600px 0px" },
+    );
+    state.browseObserver.observe(sentinel);
+  }
+
   function carouselSlideTemplate(item, animationClass = "") {
     const image = item.backdrop || item.poster || imageFallback(item.title, true);
     const watchUrl = api().buildWatchUrl(item);
@@ -122,7 +317,7 @@
 
         <div class="relative z-10 flex h-full max-w-4xl flex-col justify-end p-5 md:p-8">
           <div class="mb-4 flex items-center gap-3 text-sm text-slate-300">
-            <span class="rounded-full bg-sky-400/15 px-3 py-1 font-black uppercase text-sky-300">Trending movie</span>
+            <span class="rounded-full bg-sky-400/15 px-3 py-1 font-black uppercase text-sky-300">${api().mediaLabel(item.mediaType)}</span>
             <span>${escapeHtml(item.year)}</span>
             <span class="rounded-full bg-blue-500/20 px-3 py-1 font-black text-sky-200">${escapeHtml(item.rating)}</span>
           </div>
@@ -157,7 +352,7 @@
       carousel.innerHTML = `
         <div class="relative grid h-full place-items-center overflow-hidden">
           <div class="absolute inset-0 animate-pulse bg-gradient-to-r from-blue-950/30 via-sky-500/10 to-blue-950/30"></div>
-          <div class="relative z-10 text-sm font-bold text-slate-400">Loading trending movies...</div>
+          <div class="relative z-10 text-sm font-bold text-slate-400">Loading titles...</div>
         </div>
       `;
       return;
@@ -243,29 +438,55 @@
     }, 8000);
   }
 
-  async function loadHomeFeeds() {
-    renderCarousel();
+  function configureHomeSections() {
+    setSectionVisible("#trendingSection", true);
+    setSectionVisible("#newestMoviesSection", true);
+    setSectionVisible("#newestSeriesSection", true);
+    setSectionVisible("#browseSection", true);
+
+    setText("#trendingTitle", "Trending this week");
+    setText("#newestMoviesTitle", "Newest movies");
+    setText("#newestSeriesTitle", "Newest series");
+    setText("#browseTitle", "Browse");
+  }
+
+  function renderVisibleSkeletons() {
     renderSkeleton("#trendingGrid");
     renderSkeleton("#newestMoviesGrid");
     renderSkeleton("#newestSeriesGrid");
+    renderBrowseGrid(browseBatchSize());
+  }
 
-    const [carousel, trending, newestMovies, newestSeries] = await Promise.all([
+  async function loadHomeFeeds() {
+    configureHomeSections();
+    renderCarousel();
+    renderVisibleSkeletons();
+
+    const [
+      trendingMovies,
+      trendingMixed,
+      newestMovies,
+      newestSeries,
+    ] = await Promise.all([
       api().getTrendingMovies(api().PAGE_SIZE),
       api().getTrendingThisWeek(api().PAGE_SIZE),
       api().getNewestMovies(api().PAGE_SIZE),
       api().getNewestSeries(api().PAGE_SIZE),
     ]);
 
-    state.carouselItems = carousel.items || carousel;
-    state.trending = trending.items || [];
-    state.newestMovies = newestMovies.items || [];
-    state.newestSeries = newestSeries.items || [];
-    state.sources = new Set([
-      carousel.source || "demo",
-      trending.source || "demo",
-      newestMovies.source || "demo",
-      newestSeries.source || "demo",
-    ]);
+    let carouselFeed = trendingMovies;
+    let trendingFeed = trendingMixed;
+    let movieFeed = newestMovies;
+    let seriesFeed = newestSeries;
+
+    state.carouselItems = carouselFeed.items || carouselFeed || [];
+    state.trending = trendingFeed.items || [];
+    state.newestMovies = movieFeed.items || [];
+    state.newestSeries = seriesFeed.items || [];
+
+    let visibleFeeds = [carouselFeed, trendingFeed, movieFeed, seriesFeed];
+
+    state.sources = new Set(visibleFeeds.map((feed) => feed.source).filter(Boolean));
     state.activeSlide = 0;
     state.carouselChanging = false;
     state.pendingSlide = 0;
@@ -273,28 +494,35 @@
 
     renderCarousel();
     renderFeedMeta();
-    renderGrid("#trendingGrid", state.trending, "No weekly trends found.");
-    renderGrid("#newestMoviesGrid", state.newestMovies, "No newest movies found.");
+    renderGrid("#trendingGrid", state.trending, "No trending titles found.");
+    renderGrid("#newestMoviesGrid", state.newestMovies, "No titles found.");
     renderGrid("#newestSeriesGrid", state.newestSeries, "No newest series found.");
     startCarouselTimer();
+    setupBrowseObserver();
+    await loadMoreBrowseItems();
   }
 
   window.initHomePage = function initHomePage() {
     window.clearInterval(state.carouselTimer);
 
     state.activeSlide = 0;
+    state.browseObserver?.disconnect();
     state.carouselChanging = false;
     state.carouselItems = [];
     state.newestMovies = [];
     state.newestSeries = [];
     state.trending = [];
     state.sources = new Set();
+    resetBrowseState();
 
     loadHomeFeeds().catch(() => {
       renderFeedMeta();
       renderGrid("#trendingGrid", [], "Trending titles could not load.");
-      renderGrid("#newestMoviesGrid", [], "Newest movies could not load.");
+      renderGrid("#newestMoviesGrid", [], "Titles could not load.");
       renderGrid("#newestSeriesGrid", [], "Newest series could not load.");
+      state.browseHasMore = false;
+      state.browseLoading = false;
+      renderBrowseGrid();
     });
   };
 })();

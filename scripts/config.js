@@ -6,6 +6,9 @@
     tmdbApiBaseUrl: "https://api.themoviedb.org/3",
     tmdbImageBaseUrl: "https://image.tmdb.org/t/p",
     tmdbRegion: "US",
-    embedBaseUrl: "https://vidsrc.to/embed",
+    vidsrcEmbedBaseUrl: "https://vidsrc.to/embed",
+    twoEmbedBaseUrl: "https://www.2embed.cc/embed",
+    multiEmbedBaseUrl: "https://multiembed.mov",
+    vidlinkEmbedBaseUrl: "https://vidlink.pro",
   };
 })();

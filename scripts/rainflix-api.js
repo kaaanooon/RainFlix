@@ -257,11 +257,21 @@
   }
 
   function normalizeMediaType(mediaType) {
-    return mediaType === "tv" || mediaType === "series" ? "tv" : "movie";
+    if (mediaType === "tv" || mediaType === "series") {
+      return "tv";
+    }
+
+    return "movie";
   }
 
   function mediaLabel(mediaType) {
-    return normalizeMediaType(mediaType) === "tv" ? "Series" : "Movie";
+    const normalizedType = normalizeMediaType(mediaType);
+
+    if (normalizedType === "tv") {
+      return "Series";
+    }
+
+    return "Movie";
   }
 
   function escapeHtml(value) {
@@ -568,6 +578,8 @@
       return [];
     }
 
+    let tmdbResults = [];
+
     try {
       const data = await tmdbFetch("search/multi", {
         query: cleanQuery,
@@ -577,22 +589,22 @@
 
       if (!data) {
         const loweredQuery = cleanQuery.toLowerCase();
-        return FALLBACK_TITLES.filter((item) =>
+        tmdbResults = FALLBACK_TITLES.filter((item) =>
           `${item.title} ${mediaLabel(item.mediaType)} ${item.year}`
             .toLowerCase()
             .includes(loweredQuery),
-        ).slice(0, limit);
+        );
+      } else {
+        tmdbResults = (data.results || [])
+          .filter((item) => item.media_type === "movie" || item.media_type === "tv")
+          .map((item) => mapTmdbTitle(item))
+          .filter((item) => item.poster || item.backdrop);
       }
-
-      return (data.results || [])
-        .filter((item) => item.media_type === "movie" || item.media_type === "tv")
-        .map((item) => mapTmdbTitle(item))
-        .filter((item) => item.poster || item.backdrop)
-        .slice(0, limit);
     } catch (error) {
       console.warn(error);
-      return [];
     }
+
+    return tmdbResults.slice(0, limit);
   }
 
   async function getDetails(mediaType, id) {
@@ -674,19 +686,175 @@
     return `#watch/movie/${encodeURIComponent(item.id)}`;
   }
 
-  function buildStreamUrl({ mediaType, id, season = 1, episode = 1 }) {
-    const baseUrl = config().embedBaseUrl || "https://vidsrc.to/embed";
-    const normalizedType = normalizeMediaType(mediaType);
+  function cleanBaseUrl(value) {
+    return String(value || "").replace(/\/+$/, "");
+  }
 
-    if (normalizedType === "tv") {
-      return `${baseUrl}/tv/${encodeURIComponent(id)}/${Number.parseInt(season, 10) || 1}/${Number.parseInt(episode, 10) || 1}`;
+  function buildUrlWithQuery(baseUrl, params = {}) {
+    const url = new URL(cleanBaseUrl(baseUrl));
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        url.searchParams.set(key, value);
+      }
+    });
+
+    return url.toString();
+  }
+
+  function twoEmbedMovieBaseUrl(value) {
+    const baseUrl = cleanBaseUrl(value || "https://www.2embed.cc/embed");
+
+    if (/\/embed$/i.test(baseUrl)) {
+      return baseUrl;
     }
 
-    return `${baseUrl}/movie/${encodeURIComponent(id)}`;
+    if (/\/embedtv$/i.test(baseUrl)) {
+      return baseUrl.replace(/\/embedtv$/i, "/embed");
+    }
+
+    return `${baseUrl}/embed`;
+  }
+
+  function twoEmbedTvBaseUrl(value) {
+    const baseUrl = cleanBaseUrl(value || "https://www.2embed.cc/embed");
+
+    if (/\/embedtv$/i.test(baseUrl)) {
+      return baseUrl;
+    }
+
+    if (/\/embed$/i.test(baseUrl)) {
+      return baseUrl.replace(/\/embed$/i, "/embedtv");
+    }
+
+    return `${baseUrl}/embedtv`;
+  }
+
+  function buildMultiEmbedUrl({ mediaType, id, season = 1, episode = 1, baseUrl }) {
+    const normalizedType = normalizeMediaType(mediaType);
+    const params = {
+      video_id: id,
+      tmdb: 1,
+    };
+
+    if (normalizedType === "tv") {
+      params.s = Number.parseInt(season, 10) || 1;
+      params.e = Number.parseInt(episode, 10) || 1;
+    }
+
+    return buildUrlWithQuery(baseUrl, params);
+  }
+
+  function buildVidLinkUrl({
+    mediaType,
+    id,
+    season = 1,
+    episode = 1,
+    baseUrl,
+  }) {
+    const normalizedType = normalizeMediaType(mediaType);
+    const cleanBase = cleanBaseUrl(baseUrl || "https://vidlink.pro");
+    const cleanSeason = Number.parseInt(season, 10) || 1;
+    const cleanEpisode = Number.parseInt(episode, 10) || 1;
+
+    if (normalizedType === "tv") {
+      return `${cleanBase}/tv/${encodeURIComponent(id)}/${cleanSeason}/${cleanEpisode}`;
+    }
+
+    return `${cleanBase}/movie/${encodeURIComponent(id)}`;
+  }
+
+  function streamSources(mediaType = "movie") {
+    const normalizedType = normalizeMediaType(mediaType);
+    const sources = [
+      {
+        id: "vidsrc",
+        label: "VidSrc",
+        baseUrl: cleanBaseUrl(config().vidsrcEmbedBaseUrl || "https://vidsrc.to/embed"),
+        mediaTypes: ["movie", "tv"],
+      },
+      {
+        id: "2embed",
+        label: "2embed",
+        baseUrl: cleanBaseUrl(config().twoEmbedBaseUrl || "https://www.2embed.cc/embed"),
+        mediaTypes: ["movie", "tv"],
+      },
+      {
+        id: "multiembed",
+        label: "MultiEmbed",
+        baseUrl: cleanBaseUrl(config().multiEmbedBaseUrl || "https://multiembed.mov"),
+        mediaTypes: ["movie", "tv"],
+      },
+      {
+        id: "vidlink",
+        label: "VidLink",
+        baseUrl: cleanBaseUrl(config().vidlinkEmbedBaseUrl || "https://vidlink.pro"),
+        mediaTypes: ["movie", "tv"],
+      },
+    ];
+
+    return sources.filter((source) => source.mediaTypes.includes(normalizedType));
+  }
+
+  function buildStreamUrl({
+    mediaType,
+    id,
+    season = 1,
+    episode = 1,
+    source = "vidsrc",
+  }) {
+    const streamSource =
+      streamSources(mediaType).find((item) => item.id === source) ||
+      streamSources(mediaType)[0];
+    const normalizedType = normalizeMediaType(mediaType);
+    const cleanSeason = Number.parseInt(season, 10) || 1;
+    const cleanEpisode = Number.parseInt(episode, 10) || 1;
+
+    if (streamSource.id === "2embed") {
+      if (normalizedType === "tv") {
+        return `${twoEmbedTvBaseUrl(streamSource.baseUrl)}/${encodeURIComponent(id)}&s=${cleanSeason}&e=${cleanEpisode}`;
+      }
+
+      return `${twoEmbedMovieBaseUrl(streamSource.baseUrl)}/${encodeURIComponent(id)}`;
+    }
+
+    if (streamSource.id === "multiembed") {
+      return buildMultiEmbedUrl({
+        mediaType: normalizedType,
+        id,
+        season: cleanSeason,
+        episode: cleanEpisode,
+        baseUrl: streamSource.baseUrl,
+      });
+    }
+
+    if (streamSource.id === "vidlink") {
+      return buildVidLinkUrl({
+        mediaType: normalizedType,
+        id,
+        season: cleanSeason,
+        episode: cleanEpisode,
+        baseUrl: streamSource.baseUrl,
+      });
+    }
+
+    if (normalizedType === "tv") {
+      return `${streamSource.baseUrl}/tv/${encodeURIComponent(id)}/${cleanSeason}/${cleanEpisode}`;
+    }
+
+    return `${streamSource.baseUrl}/movie/${encodeURIComponent(id)}`;
+  }
+
+  function buildStreamSources(params) {
+    return streamSources(params.mediaType).map((source) => ({
+      ...source,
+      url: buildStreamUrl({ ...params, source: source.id }),
+    }));
   }
 
   window.RainFlixApi = {
     PAGE_SIZE,
+    buildStreamSources,
     buildStreamUrl,
     buildWatchUrl,
     createImageFallback,

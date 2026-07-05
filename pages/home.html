@@ -8,7 +8,7 @@
     aria-label="Trending movie carousel"
   ></section>
 
-  <section class="mt-10" aria-labelledby="trendingTitle">
+  <section id="trendingSection" class="mt-10" aria-labelledby="trendingTitle">
     <div class="mb-5 flex items-end justify-between gap-6">
       <div>
         <h1 id="trendingTitle" class="text-3xl font-black text-slate-50">
@@ -26,7 +26,7 @@
     ></div>
   </section>
 
-  <section class="mt-12" aria-labelledby="newestMoviesTitle">
+  <section id="newestMoviesSection" class="mt-12" aria-labelledby="newestMoviesTitle">
     <div class="mb-5">
       <h2 id="newestMoviesTitle" class="text-3xl font-black text-slate-50">
         Newest movies
@@ -39,7 +39,7 @@
     ></div>
   </section>
 
-  <section class="mt-12" aria-labelledby="newestSeriesTitle">
+  <section id="newestSeriesSection" class="mt-12" aria-labelledby="newestSeriesTitle">
     <div class="mb-5">
       <h2 id="newestSeriesTitle" class="text-3xl font-black text-slate-50">
         Newest series
@@ -50,5 +50,19 @@
       class="grid auto-cols-[9.5rem] grid-flow-col gap-3 overflow-x-auto pb-2 md:grid-flow-row md:grid-cols-5 md:gap-4 md:overflow-visible md:pb-0"
       aria-live="polite"
     ></div>
+  </section>
+
+  <section id="browseSection" class="mt-12" aria-labelledby="browseTitle">
+    <div class="mb-5">
+      <h2 id="browseTitle" class="text-3xl font-black text-slate-50">
+        Browse
+      </h2>
+    </div>
+    <div
+      id="browseGrid"
+      class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5 md:gap-4"
+      aria-live="polite"
+    ></div>
+    <div id="browseSentinel" class="h-12" aria-hidden="true"></div>
   </section>
 </section>

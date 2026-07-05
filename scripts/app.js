@@ -7,16 +7,6 @@
       script: "./pages/home.js",
       init: "initHomePage",
     },
-    movies: {
-      html: "./pages/home.html",
-      script: "./pages/home.js",
-      init: "initHomePage",
-    },
-    series: {
-      html: "./pages/home.html",
-      script: "./pages/home.js",
-      init: "initHomePage",
-    },
     watch: {
       html: "./pages/watch.html",
       script: "./pages/watch.js",

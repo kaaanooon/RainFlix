@@ -2,6 +2,7 @@
   const state = {
     details: null,
     episode: 1,
+    playerSource: "vidsrc",
     season: 1,
     seasonDetails: null,
   };
@@ -76,10 +77,11 @@
     }
 
     const image = details.backdrop || details.poster || imageFallback(details.title, true);
-    const startText =
-      details.mediaType === "tv"
-        ? `Start watching S${state.season}:E${state.episode}`
-        : "Start watching movie";
+    let startText = "Start watching movie";
+
+    if (details.mediaType === "tv") {
+      startText = `Start watching S${state.season}:E${state.episode}`;
+    }
 
     hero.innerHTML = `
       <article class="relative h-[28rem] overflow-hidden">
@@ -172,28 +174,74 @@
 
   function renderPlayer() {
     const shell = document.querySelector("#playerShell");
+    const sourceShell = document.querySelector("#playerSourceShell");
     const details = state.details;
 
-    if (!shell || !details) {
+    if (!shell || !sourceShell || !details) {
       return;
     }
 
-    const src = api().buildStreamUrl({
+    const sources = api().buildStreamSources({
       mediaType: details.mediaType,
       id: details.id,
       season: state.season,
       episode: state.episode,
     });
+    const activeSource =
+      sources.find((source) => source.id === state.playerSource) || sources[0];
+
+    if (!activeSource) {
+      shell.innerHTML = `
+        <div class="aspect-video w-full bg-black p-6 text-sm text-slate-400">
+          No streaming sources are configured.
+        </div>
+      `;
+      sourceShell.innerHTML = "";
+      return;
+    }
+
+    state.playerSource = activeSource.id;
 
     shell.innerHTML = `
       <iframe
         class="aspect-video w-full bg-black"
-        src="${src}"
-        title="${escapeHtml(details.title)} player"
+        src="${escapeHtml(activeSource.url)}"
+        title="${escapeHtml(details.title)} ${escapeHtml(activeSource.label)} player"
         allowfullscreen
         referrerpolicy="origin"
       ></iframe>
     `;
+
+    sourceShell.innerHTML = `
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-xs font-black uppercase tracking-wider text-slate-400">Players</p>
+        <div class="flex flex-wrap gap-2" role="group" aria-label="Streaming source">
+          ${sources
+            .map((source) => {
+              const isActive = source.id === activeSource.id;
+
+              return `
+                <button
+                  class="rounded-lg border px-3 py-2 text-xs font-black transition ${isActive ? "border-sky-400 bg-sky-400 text-slate-950" : "border-blue-900/70 bg-slate-950/45 text-slate-300 hover:border-sky-500/70 hover:bg-sky-400/10 hover:text-sky-200"}"
+                  type="button"
+                  data-player-source="${escapeHtml(source.id)}"
+                  aria-pressed="${isActive}"
+                >
+                  ${escapeHtml(source.label)}
+                </button>
+              `;
+            })
+            .join("")}
+        </div>
+      </div>
+    `;
+
+    sourceShell.querySelectorAll("[data-player-source]").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.playerSource = button.getAttribute("data-player-source") || "vidsrc";
+        renderPlayer();
+      });
+    });
   }
 
   function syncWatchHash() {
