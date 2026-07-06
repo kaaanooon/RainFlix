@@ -10,6 +10,9 @@
     browseTotalPages: null,
     carouselChanging: false,
     carouselItems: [],
+    carouselPointerId: null,
+    carouselStartX: 0,
+    carouselStartY: 0,
     carouselTimer: null,
     newestMovies: [],
     newestSeries: [],
@@ -96,9 +99,7 @@
       return;
     }
 
-    meta.textContent = state.sources.has("tmdb")
-      ? "Live TMDb feeds. Browse loads five rows at a time."
-      : "Demo feeds shown. Add TMDb credentials in scripts/config.js for live TMDb results.";
+    meta.textContent = "";
   }
 
   function cardTemplate(item) {
@@ -341,6 +342,64 @@
     `;
   }
 
+  function attachCarouselSwipe(carousel) {
+    if (carousel.dataset.swipeReady === "true") {
+      return;
+    }
+
+    carousel.dataset.swipeReady = "true";
+
+    const resetSwipe = () => {
+      state.carouselPointerId = null;
+      state.carouselStartX = 0;
+      state.carouselStartY = 0;
+    };
+
+    carousel.addEventListener("pointerdown", (event) => {
+      if (
+        !event.isPrimary ||
+        state.carouselChanging ||
+        event.target.closest("a, button, input, select, textarea")
+      ) {
+        return;
+      }
+
+      state.carouselPointerId = event.pointerId;
+      state.carouselStartX = event.clientX;
+      state.carouselStartY = event.clientY;
+      window.clearInterval(state.carouselTimer);
+      carousel.setPointerCapture?.(event.pointerId);
+    });
+
+    carousel.addEventListener("pointerup", (event) => {
+      if (state.carouselPointerId !== event.pointerId) {
+        return;
+      }
+
+      const deltaX = event.clientX - state.carouselStartX;
+      const deltaY = event.clientY - state.carouselStartY;
+      const isSwipe =
+        Math.abs(deltaX) > 48 && Math.abs(deltaX) > Math.abs(deltaY) * 1.15;
+
+      resetSwipe();
+
+      if (isSwipe) {
+        changeSlide(state.activeSlide + (deltaX < 0 ? 1 : -1));
+      } else {
+        startCarouselTimer();
+      }
+    });
+
+    carousel.addEventListener("pointercancel", () => {
+      if (state.carouselPointerId === null) {
+        return;
+      }
+
+      resetSwipe();
+      startCarouselTimer();
+    });
+  }
+
   function renderCarousel() {
     const carousel = document.querySelector("#trendingCarousel");
 
@@ -352,7 +411,6 @@
       carousel.innerHTML = `
         <div class="relative grid h-full place-items-center overflow-hidden">
           <div class="absolute inset-0 animate-pulse bg-gradient-to-r from-blue-950/30 via-sky-500/10 to-blue-950/30"></div>
-          <div class="relative z-10 text-sm font-bold text-slate-400">Loading titles...</div>
         </div>
       `;
       return;
@@ -403,6 +461,8 @@
         changeSlide(Number.parseInt(button.getAttribute("data-slide"), 10) || 0);
       });
     });
+
+    attachCarouselSwipe(carousel);
   }
 
   function changeSlide(nextIndex) {
@@ -509,6 +569,9 @@
     state.browseObserver?.disconnect();
     state.carouselChanging = false;
     state.carouselItems = [];
+    state.carouselPointerId = null;
+    state.carouselStartX = 0;
+    state.carouselStartY = 0;
     state.newestMovies = [];
     state.newestSeries = [];
     state.trending = [];

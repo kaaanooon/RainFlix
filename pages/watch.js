@@ -295,9 +295,15 @@
           <h2 id="episodesTitle" class="text-2xl font-black text-slate-50">
             Episodes
           </h2>
-          <p class="mt-2 text-sm text-slate-400">
-            ${escapeHtml(state.seasonDetails?.synopsis || "Choose an episode to update the stream.")}
-          </p>
+          ${
+            state.seasonDetails?.synopsis
+              ? `
+                <p class="mt-2 text-sm text-slate-400">
+                  ${escapeHtml(state.seasonDetails.synopsis)}
+                </p>
+              `
+              : ""
+          }
         </div>
 
         <label class="flex items-center gap-3 text-sm font-bold text-slate-300">
