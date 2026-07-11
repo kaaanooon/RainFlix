@@ -7,6 +7,8 @@
     seasonDetails: null,
   };
 
+  const PLAYER_STORAGE_KEY = "rainflix:player-source";
+
   function api() {
     return window.RainFlixApi;
   }
@@ -79,6 +81,8 @@
     const image = details.backdrop || details.poster || imageFallback(details.title, true);
     let startText = "Start watching movie";
 
+    window.RainFlixSetBackdrop?.(image);
+
     if (details.mediaType === "tv") {
       startText = `Start watching S${state.season}:E${state.episode}`;
     }
@@ -86,7 +90,7 @@
     hero.innerHTML = `
       <article class="relative h-[28rem] overflow-hidden">
         <img
-          class="absolute inset-0 h-full w-full object-cover opacity-55"
+          class="absolute inset-0 h-full w-full object-cover opacity-85"
           src="${image}"
           alt=""
           onerror="this.onerror=null;this.src='${imageFallback(details.title, true)}';"
@@ -102,22 +106,26 @@
             ${details.runtime ? `<span>${escapeHtml(details.runtime)}</span>` : ""}
           </div>
 
-          <h1 class="max-w-3xl text-6xl font-black leading-none text-slate-50">
-            ${escapeHtml(details.title)}
+          <h1 class="max-w-3xl text-5xl font-black leading-none text-slate-50 lg:text-6xl">
+            ${
+              details.logo
+                ? `<img class="title-logo max-h-24 w-auto max-w-[min(30rem,78vw)] object-contain object-left lg:max-h-32" src="${details.logo}" alt="${escapeHtml(details.title)}" decoding="async" onerror="this.classList.add('hidden');this.nextElementSibling.classList.remove('hidden');" /><span class="hidden">${escapeHtml(details.title)}</span>`
+                : escapeHtml(details.title)
+            }
           </h1>
 
           <p class="mt-5 line-clamp-4 max-w-2xl text-base leading-7 text-slate-300">
             ${escapeHtml(details.synopsis)}
           </p>
-        </div>
 
-        <button
-          class="absolute bottom-8 right-8 z-10 rounded-lg bg-sky-400 px-6 py-3 text-sm font-black text-slate-950 shadow-xl shadow-sky-500/20 transition hover:bg-sky-300 focus-visible:bg-sky-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-400/25"
-          type="button"
-          data-scroll-player
-        >
-          ${escapeHtml(startText)}
-        </button>
+          <button
+            class="mt-5 w-fit rounded-lg bg-sky-400 px-6 py-3 text-sm font-black text-slate-950 shadow-xl shadow-sky-500/20 transition hover:bg-sky-300 focus-visible:bg-sky-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-400/25"
+            type="button"
+            data-scroll-player
+          >
+            ${escapeHtml(startText)}
+          </button>
+        </div>
       </article>
     `;
 
@@ -203,14 +211,25 @@
     state.playerSource = activeSource.id;
 
     shell.innerHTML = `
-      <iframe
-        class="aspect-video w-full bg-black"
-        src="${escapeHtml(activeSource.url)}"
-        title="${escapeHtml(details.title)} ${escapeHtml(activeSource.label)} player"
-        allowfullscreen
-        referrerpolicy="origin"
-      ></iframe>
+      <div class="relative aspect-video w-full overflow-hidden bg-black">
+        <div class="absolute inset-0 grid place-items-center bg-slate-950" data-player-loading aria-hidden="true">
+          <div class="h-8 w-8 animate-spin rounded-full border-2 border-blue-950 border-t-sky-400"></div>
+        </div>
+        <iframe
+          class="absolute inset-0 h-full w-full bg-black"
+          src="${escapeHtml(activeSource.url)}"
+          title="${escapeHtml(details.title)} ${escapeHtml(activeSource.label)} player"
+          allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+          allowfullscreen
+          loading="eager"
+          referrerpolicy="origin"
+        ></iframe>
+      </div>
     `;
+
+    shell.querySelector("iframe")?.addEventListener("load", () => {
+      shell.querySelector("[data-player-loading]")?.classList.add("hidden");
+    });
 
     sourceShell.innerHTML = `
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -239,6 +258,11 @@
     sourceShell.querySelectorAll("[data-player-source]").forEach((button) => {
       button.addEventListener("click", () => {
         state.playerSource = button.getAttribute("data-player-source") || "vidsrc";
+        try {
+          window.localStorage.setItem(PLAYER_STORAGE_KEY, state.playerSource);
+        } catch (error) {
+          // Remembering a preference is optional when storage is unavailable.
+        }
         renderPlayer();
       });
     });
@@ -370,6 +394,7 @@
 
   window.initWatchPage = async function initWatchPage(context = {}) {
     const { mediaType, id, season, episode } = context.params || {};
+    const isCurrent = context.isCurrent || (() => true);
 
     showLoading();
 
@@ -381,12 +406,24 @@
     const normalizedType = api().normalizeMediaType(mediaType);
     const details = await api().getDetails(normalizedType, id);
 
+    if (!isCurrent()) {
+      return;
+    }
+
     if (!details) {
       renderError("RainFlix could not find metadata for this title.");
       return;
     }
 
     state.details = details;
+    document.title = `${details.title} | RainFlix`;
+
+    try {
+      state.playerSource =
+        window.localStorage.getItem(PLAYER_STORAGE_KEY) || state.playerSource;
+    } catch (error) {
+      // Keep the default source when storage is unavailable.
+    }
     state.season = Number.parseInt(season, 10) || 1;
     state.episode = Number.parseInt(episode, 10) || 1;
     state.seasonDetails = null;
@@ -397,6 +434,10 @@
       );
       state.season = seasonExists ? state.season : details.seasons[0]?.seasonNumber || 1;
       state.seasonDetails = await api().getSeasonDetails(details.id, state.season);
+
+      if (!isCurrent()) {
+        return;
+      }
 
       const episodeExists = state.seasonDetails.episodes.some(
         (item) => item.episodeNumber === state.episode,

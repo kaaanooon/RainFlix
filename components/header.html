@@ -1,46 +1,75 @@
-<header
-  class="sticky top-0 z-[80] grid w-full grid-cols-[auto_minmax(0,36rem)] items-center justify-between gap-4 border-b border-blue-950/70 bg-slate-950/85 px-4 py-4 shadow-2xl shadow-black/20 backdrop-blur-xl md:gap-8 md:px-10 lg:px-12"
->
-  <a
-    class="inline-flex min-w-max items-center text-slate-50 no-underline"
-    href="#home"
-    aria-label="RainFlix home"
-  >
-    <span class="text-lg font-black md:text-xl">RainFlix</span>
-  </a>
-
-  <div class="relative flex justify-end">
-    <label
-      class="flex h-10 w-full items-center gap-3 rounded-lg border border-blue-900/70 bg-blue-950/30 px-3 text-slate-400 transition focus-within:border-sky-400 focus-within:ring-4 focus-within:ring-sky-400/10 md:h-11 md:px-4"
-      for="globalSearch"
+<header class="border-b border-blue-950/70 bg-slate-950/90 shadow-xl shadow-black/25 backdrop-blur-xl">
+  <div class="mx-auto flex h-[4.5rem] w-full max-w-[1536px] items-center gap-2 px-4 md:gap-6 md:px-10 lg:px-12">
+    <a
+      class="inline-flex min-w-max items-center text-lg font-black text-slate-50 no-underline md:text-xl"
+      href="#home"
+      aria-label="RainFlix home"
     >
-      <svg
-        class="h-4 w-4 shrink-0"
-        viewBox="0 0 24 24"
-        fill="none"
-        aria-hidden="true"
-      >
-        <path
-          d="m21 21-4.2-4.2m2.2-5.3a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-        />
-      </svg>
-      <input
-        id="globalSearch"
-        class="w-full min-w-0 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
-        type="search"
-        placeholder="Search titles"
-        autocomplete="off"
-      />
-    </label>
+      RainFlix
+    </a>
 
-    <div
-      id="searchDropdown"
-      class="absolute right-0 top-[calc(100%+0.5rem)] z-[90] hidden w-full overflow-hidden rounded-lg border border-blue-900/80 bg-slate-950/95 shadow-2xl shadow-black/45 backdrop-blur-xl"
-      role="listbox"
-      aria-label="Search results"
-    ></div>
+    <nav class="hidden items-center gap-1 md:flex" aria-label="Primary navigation">
+      <a class="rounded-lg px-3 py-2 text-sm font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#home" data-nav-route="home">Home</a>
+      <a class="rounded-lg px-3 py-2 text-sm font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#movies" data-nav-route="movies">Movies</a>
+      <a class="rounded-lg px-3 py-2 text-sm font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#series" data-nav-route="series">Series</a>
+    </nav>
+
+    <div class="relative ml-auto min-w-0 flex-1 md:max-w-md">
+      <label
+        class="flex h-10 w-full items-center gap-3 rounded-lg border border-blue-900/70 bg-blue-950/35 px-3 text-slate-400 transition focus-within:border-sky-400 focus-within:ring-4 focus-within:ring-sky-400/10 md:h-11 md:px-4"
+        for="globalSearch"
+      >
+        <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="m21 21-4.2-4.2m2.2-5.3a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        <input
+          id="globalSearch"
+          class="w-full min-w-0 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
+          type="search"
+          placeholder="Search titles"
+          autocomplete="off"
+          aria-autocomplete="list"
+          aria-controls="searchDropdown"
+          aria-expanded="false"
+        />
+      </label>
+
+      <div
+        id="searchDropdown"
+        class="absolute -right-12 top-[calc(100%+0.5rem)] z-[210] hidden w-[min(30rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-blue-900/80 bg-slate-950/95 shadow-2xl shadow-black/45 backdrop-blur-xl md:right-0"
+        role="listbox"
+        aria-label="Search results"
+      ></div>
+    </div>
+
+    <button
+      id="mobileNavToggle"
+      class="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-blue-900/70 bg-blue-950/35 text-xl text-slate-100 transition hover:border-sky-500/70 hover:text-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 md:hidden"
+      type="button"
+      aria-label="Open navigation"
+      aria-controls="mobileNavLayer"
+      aria-expanded="false"
+      title="Menu"
+    >
+      <span aria-hidden="true">&#9776;</span>
+    </button>
+  </div>
+
+  <div id="mobileNavLayer" class="hidden md:hidden" aria-hidden="true">
+    <button id="mobileNavBackdrop" class="fixed inset-0 z-[300] cursor-default bg-black/80" type="button" aria-label="Close navigation"></button>
+    <aside class="fixed inset-y-0 left-0 z-[310] w-[min(18rem,82vw)] border-r border-blue-900/70 bg-slate-950 p-5 shadow-2xl shadow-black/60" aria-label="Mobile navigation">
+      <div class="flex items-center justify-between border-b border-blue-950/80 pb-5">
+        <a class="text-xl font-black text-slate-50" href="#home">RainFlix</a>
+        <button id="mobileNavClose" class="grid h-10 w-10 place-items-center text-3xl leading-none text-slate-400 transition hover:text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" type="button" aria-label="Close navigation" title="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+
+      <nav class="mt-5 grid gap-2" aria-label="Mobile primary navigation">
+        <a class="rounded-lg px-4 py-3 text-base font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#home" data-nav-route="home">Home</a>
+        <a class="rounded-lg px-4 py-3 text-base font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#movies" data-nav-route="movies">Movies</a>
+        <a class="rounded-lg px-4 py-3 text-base font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#series" data-nav-route="series">Series</a>
+      </nav>
+    </aside>
   </div>
 </header>

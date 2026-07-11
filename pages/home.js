@@ -8,12 +8,15 @@
     browseNextPage: 2,
     browseObserver: null,
     browseTotalPages: null,
+    catalogFilter: "all",
     carouselChanging: false,
     carouselItems: [],
+    carouselLoadId: 0,
     carouselPointerId: null,
     carouselStartX: 0,
     carouselStartY: 0,
     carouselTimer: null,
+    carouselTransitionTimer: null,
     newestMovies: [],
     newestSeries: [],
     pendingSlide: 0,
@@ -108,7 +111,7 @@
 
     return `
       <a
-        class="group block overflow-hidden rounded-lg border border-blue-900/70 bg-slate-950 shadow-xl shadow-black/30 outline-none transition hover:-translate-y-1 hover:border-sky-500/70 focus-visible:-translate-y-1 focus-visible:border-sky-500/70 focus-visible:ring-4 focus-visible:ring-sky-400/20"
+        class="catalog-card group block overflow-hidden rounded-lg border border-blue-900/70 bg-slate-950 outline-none transition hover:-translate-y-1 hover:border-sky-500/70 focus-visible:-translate-y-1 focus-visible:border-sky-500/70 focus-visible:ring-4 focus-visible:ring-sky-400/20"
         href="${watchUrl}"
         aria-label="Watch ${escapeHtml(item.title)}"
       >
@@ -168,7 +171,7 @@
     state.browseHasMore = true;
     state.browseItems = [];
     state.browseLoading = false;
-    state.browseNextPage = 1;
+    state.browseNextPage = 2;
     state.browseTotalPages = null;
   }
 
@@ -227,7 +230,7 @@
       }
 
       const feed = await api().getTrending({
-        filter: "all",
+        filter: state.catalogFilter,
         page: state.browseNextPage,
         limit: 20,
       });
@@ -308,7 +311,7 @@
     return `
       <article class="absolute inset-0 h-full overflow-hidden ${animationClass}">
         <img
-          class="absolute inset-0 h-full w-full object-cover opacity-55"
+          class="absolute inset-0 h-full w-full object-cover opacity-85"
           src="${image}"
           alt=""
           onerror="this.onerror=null;this.src='${imageFallback(item.title, true)}';"
@@ -324,7 +327,11 @@
           </div>
 
           <h2 class="max-w-3xl text-4xl font-black leading-none text-slate-50 md:text-6xl">
-            ${escapeHtml(item.title)}
+            ${
+              item.logo
+                ? `<img class="title-logo max-h-20 w-auto max-w-[min(28rem,78vw)] object-contain object-left md:max-h-28" src="${item.logo}" alt="${escapeHtml(item.title)}" decoding="async" onerror="this.classList.add('hidden');this.nextElementSibling.classList.remove('hidden');" /><span class="hidden">${escapeHtml(item.title)}</span>`
+                : escapeHtml(item.title)
+            }
           </h2>
 
           <p class="mt-4 line-clamp-3 max-w-2xl text-sm leading-6 text-slate-300 md:mt-5 md:line-clamp-4 md:text-base md:leading-7">
@@ -367,7 +374,7 @@
       state.carouselPointerId = event.pointerId;
       state.carouselStartX = event.clientX;
       state.carouselStartY = event.clientY;
-      window.clearInterval(state.carouselTimer);
+      window.clearTimeout(state.carouselTimer);
       carousel.setPointerCapture?.(event.pointerId);
     });
 
@@ -430,6 +437,10 @@
         : "rainflix-next-right"
       : "";
 
+    window.RainFlixSetBackdrop?.(
+      item.backdrop || item.poster || imageFallback(item.title, true),
+    );
+
     carousel.innerHTML = `
       <div class="relative h-full overflow-hidden">
         <div class="absolute left-0 right-0 top-0 z-10 h-1 bg-blue-950/80">
@@ -474,6 +485,7 @@
       (nextIndex + state.carouselItems.length) % state.carouselItems.length;
 
     if (normalizedIndex === state.activeSlide) {
+      startCarouselTimer();
       return;
     }
 
@@ -482,7 +494,8 @@
     state.carouselChanging = true;
     renderCarousel();
 
-    window.setTimeout(() => {
+    window.clearTimeout(state.carouselTransitionTimer);
+    state.carouselTransitionTimer = window.setTimeout(() => {
       state.activeSlide = normalizedIndex;
       state.pendingSlide = normalizedIndex;
       state.carouselChanging = false;
@@ -492,22 +505,47 @@
   }
 
   function startCarouselTimer() {
-    window.clearInterval(state.carouselTimer);
-    state.carouselTimer = window.setInterval(() => {
+    window.clearTimeout(state.carouselTimer);
+
+    if (!state.carouselItems.length || document.hidden) {
+      return;
+    }
+
+    state.carouselTimer = window.setTimeout(() => {
       changeSlide(state.activeSlide + 1);
     }, 8000);
   }
 
   function configureHomeSections() {
+    const isHome = state.catalogFilter === "all";
+    const isMovies = state.catalogFilter === "movie";
+    const page = document.querySelector("#catalogPage");
+    const carousel = document.querySelector("#trendingCarousel");
+
+    page?.setAttribute(
+      "aria-label",
+      isHome ? "RainFlix home" : isMovies ? "Movies catalog" : "Series catalog",
+    );
+    carousel?.setAttribute(
+      "aria-label",
+      isHome ? "Featured movies" : isMovies ? "Featured movies" : "Featured series",
+    );
+
     setSectionVisible("#trendingSection", true);
-    setSectionVisible("#newestMoviesSection", true);
-    setSectionVisible("#newestSeriesSection", true);
+    setSectionVisible("#newestMoviesSection", isHome || isMovies);
+    setSectionVisible("#newestSeriesSection", isHome || !isMovies);
     setSectionVisible("#browseSection", true);
 
-    setText("#trendingTitle", "Trending this week");
+    setText(
+      "#trendingTitle",
+      isHome ? "Trending this week" : isMovies ? "Trending movies" : "Trending series",
+    );
     setText("#newestMoviesTitle", "Newest movies");
     setText("#newestSeriesTitle", "Newest series");
-    setText("#browseTitle", "Browse");
+    setText(
+      "#browseTitle",
+      isHome ? "Browse" : isMovies ? "Browse movies" : "Browse series",
+    );
   }
 
   function renderVisibleSkeletons() {
@@ -517,34 +555,50 @@
     renderBrowseGrid(browseBatchSize());
   }
 
-  async function loadHomeFeeds() {
+  async function loadHomeFeeds(loadId) {
     configureHomeSections();
     renderCarousel();
     renderVisibleSkeletons();
 
-    const [
-      trendingMovies,
-      trendingMixed,
-      newestMovies,
-      newestSeries,
-    ] = await Promise.all([
-      api().getTrendingMovies(api().PAGE_SIZE),
-      api().getTrendingThisWeek(api().PAGE_SIZE),
-      api().getNewestMovies(api().PAGE_SIZE),
-      api().getNewestSeries(api().PAGE_SIZE),
-    ]);
+    let carouselFeed;
+    let trendingFeed;
+    let movieFeed = { items: [] };
+    let seriesFeed = { items: [] };
 
-    let carouselFeed = trendingMovies;
-    let trendingFeed = trendingMixed;
-    let movieFeed = newestMovies;
-    let seriesFeed = newestSeries;
+    if (state.catalogFilter === "all") {
+      [carouselFeed, trendingFeed, movieFeed, seriesFeed] = await Promise.all([
+        api().getTrendingMovies(api().PAGE_SIZE),
+        api().getTrendingThisWeek(api().PAGE_SIZE),
+        api().getNewestMovies(api().PAGE_SIZE),
+        api().getNewestSeries(api().PAGE_SIZE),
+      ]);
+    } else if (state.catalogFilter === "movie") {
+      [trendingFeed, movieFeed] = await Promise.all([
+        api().getTrending({ filter: "movie", page: 1, limit: api().PAGE_SIZE }),
+        api().getNewestMovies(api().PAGE_SIZE),
+      ]);
+      carouselFeed = trendingFeed;
+    } else {
+      [trendingFeed, seriesFeed] = await Promise.all([
+        api().getTrending({ filter: "tv", page: 1, limit: api().PAGE_SIZE }),
+        api().getNewestSeries(api().PAGE_SIZE),
+      ]);
+      carouselFeed = trendingFeed;
+    }
+
+    if (
+      loadId !== state.carouselLoadId ||
+      !document.querySelector("#trendingCarousel")
+    ) {
+      return;
+    }
 
     state.carouselItems = carouselFeed.items || carouselFeed || [];
     state.trending = trendingFeed.items || [];
     state.newestMovies = movieFeed.items || [];
     state.newestSeries = seriesFeed.items || [];
 
-    let visibleFeeds = [carouselFeed, trendingFeed, movieFeed, seriesFeed];
+    const visibleFeeds = [carouselFeed, trendingFeed, movieFeed, seriesFeed];
 
     state.sources = new Set(visibleFeeds.map((feed) => feed.source).filter(Boolean));
     state.activeSlide = 0;
@@ -560,10 +614,36 @@
     startCarouselTimer();
     setupBrowseObserver();
     await loadMoreBrowseItems();
+
+    api()
+      .getTitleLogos(state.carouselItems)
+      .then((items) => {
+        if (loadId !== state.carouselLoadId || !items.length) {
+          return;
+        }
+
+        state.carouselItems = items;
+        renderCarousel();
+        startCarouselTimer();
+      })
+      .catch(() => {});
   }
 
-  window.initHomePage = function initHomePage() {
-    window.clearInterval(state.carouselTimer);
+  window.initHomePage = function initHomePage(context = {}) {
+    state.catalogFilter =
+      context.routeName === "movies"
+        ? "movie"
+        : context.routeName === "series"
+          ? "tv"
+          : "all";
+    document.title =
+      state.catalogFilter === "movie"
+        ? "Movies | RainFlix"
+        : state.catalogFilter === "tv"
+          ? "Series | RainFlix"
+          : "RainFlix";
+    window.clearTimeout(state.carouselTimer);
+    window.clearTimeout(state.carouselTransitionTimer);
 
     state.activeSlide = 0;
     state.browseObserver?.disconnect();
@@ -578,7 +658,13 @@
     state.sources = new Set();
     resetBrowseState();
 
-    loadHomeFeeds().catch(() => {
+    const loadId = ++state.carouselLoadId;
+
+    return loadHomeFeeds(loadId).catch(() => {
+      if (loadId !== state.carouselLoadId) {
+        return;
+      }
+
       renderFeedMeta();
       renderGrid("#trendingGrid", [], "Trending titles could not load.");
       renderGrid("#newestMoviesGrid", [], "Titles could not load.");
@@ -588,4 +674,21 @@
       renderBrowseGrid();
     });
   };
+
+  window.destroyHomePage = function destroyHomePage() {
+    state.carouselLoadId += 1;
+    state.browseObserver?.disconnect();
+    state.carouselItems = [];
+    window.clearTimeout(state.carouselTimer);
+    window.clearTimeout(state.carouselTransitionTimer);
+  };
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      window.clearTimeout(state.carouselTimer);
+    } else {
+      renderCarousel();
+      startCarouselTimer();
+    }
+  });
 })();

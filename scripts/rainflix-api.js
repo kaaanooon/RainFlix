@@ -243,6 +243,8 @@
   ];
 
   const PAGE_SIZE = 10;
+  const TMDB_CACHE_PREFIX = "rainflix:tmdb:v1:";
+  const inFlightTmdbRequests = new Map();
 
   function config() {
     return window.RAINFLIX_CONFIG || {};
@@ -250,6 +252,62 @@
 
   function hasTmdbCredentials() {
     return Boolean(config().tmdbAccessToken || config().tmdbApiKey);
+  }
+
+  function readTmdbCache(key) {
+    try {
+      const cached = JSON.parse(window.localStorage.getItem(key));
+
+      if (!cached || typeof cached !== "object" || !("data" in cached)) {
+        return null;
+      }
+
+      return cached;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function pruneTmdbCache() {
+    const maxEntries = Math.max(10, Number(config().tmdbCacheMaxEntries) || 60);
+
+    try {
+      const entries = [];
+
+      for (let index = 0; index < window.localStorage.length; index += 1) {
+        const key = window.localStorage.key(index);
+
+        if (!key?.startsWith(TMDB_CACHE_PREFIX)) {
+          continue;
+        }
+
+        const cached = readTmdbCache(key);
+        entries.push({ key, storedAt: Number(cached?.storedAt) || 0 });
+      }
+
+      entries
+        .sort((left, right) => right.storedAt - left.storedAt)
+        .slice(maxEntries)
+        .forEach(({ key }) => window.localStorage.removeItem(key));
+    } catch (error) {
+      // Storage can be unavailable in private or restricted browsing modes.
+    }
+  }
+
+  function writeTmdbCache(key, data) {
+    try {
+      window.localStorage.setItem(
+        key,
+        JSON.stringify({
+          data,
+          expiresAt: Date.now() + (Number(config().tmdbCacheTtlMs) || 900000),
+          storedAt: Date.now(),
+        }),
+      );
+      pruneTmdbCache();
+    } catch (error) {
+      // A full or disabled cache should never prevent the catalog from loading.
+    }
   }
 
   function today() {
@@ -319,9 +377,22 @@
     return url;
   }
 
-  async function tmdbFetch(path, params = {}) {
+  async function tmdbFetch(path, params = {}, options = {}) {
     if (!hasTmdbCredentials()) {
       return null;
+    }
+
+    const requestUrl = buildTmdbUrl(path, params).toString();
+    const cacheKey = `${TMDB_CACHE_PREFIX}${requestUrl}`;
+    const shouldPersist = options.persist !== false;
+    const cached = shouldPersist ? readTmdbCache(cacheKey) : null;
+
+    if (cached?.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
+    if (inFlightTmdbRequests.has(requestUrl)) {
+      return inFlightTmdbRequests.get(requestUrl);
     }
 
     const headers = {};
@@ -330,13 +401,34 @@
       headers.Authorization = `Bearer ${config().tmdbAccessToken}`;
     }
 
-    const response = await fetch(buildTmdbUrl(path, params), { headers });
+    const request = (async () => {
+      try {
+        const response = await fetch(requestUrl, { cache: "default", headers });
 
-    if (!response.ok) {
-      throw new Error(`TMDb request failed: ${response.status}`);
-    }
+        if (!response.ok) {
+          throw new Error(`TMDb request failed: ${response.status}`);
+        }
 
-    return response.json();
+        const data = await response.json();
+
+        if (shouldPersist) {
+          writeTmdbCache(cacheKey, data);
+        }
+
+        return data;
+      } catch (error) {
+        if (cached?.data) {
+          return cached.data;
+        }
+
+        throw error;
+      } finally {
+        inFlightTmdbRequests.delete(requestUrl);
+      }
+    })();
+
+    inFlightTmdbRequests.set(requestUrl, request);
+    return request;
   }
 
   function mapTmdbTitle(item, fallbackType) {
@@ -356,6 +448,29 @@
     };
   }
 
+  function preferredLogo(images) {
+    const logos = [...(images?.logos || [])];
+
+    logos.sort((left, right) => {
+      const languageDifference =
+        Number(right.iso_639_1 === "en") - Number(left.iso_639_1 === "en");
+
+      if (languageDifference) {
+        return languageDifference;
+      }
+
+      const voteDifference = (right.vote_average || 0) - (left.vote_average || 0);
+
+      if (voteDifference) {
+        return voteDifference;
+      }
+
+      return (right.width || 0) - (left.width || 0);
+    });
+
+    return logos[0]?.file_path ? imageUrl(logos[0].file_path, "w500") : "";
+  }
+
   function mapTmdbDetails(item, mediaType) {
     const normalizedType = normalizeMediaType(mediaType);
     const releaseDate =
@@ -369,6 +484,7 @@
       rating: item.vote_average ? Number(item.vote_average).toFixed(1) : "NR",
       poster: imageUrl(item.poster_path, "w500"),
       backdrop: imageUrl(item.backdrop_path, "w1280") || imageUrl(item.poster_path, "w780"),
+      logo: preferredLogo(item.images),
       synopsis: item.overview || "No synopsis available yet.",
       runtime:
         normalizedType === "tv"
@@ -387,6 +503,28 @@
               }))
           : [],
     };
+  }
+
+  async function getTitleLogo(mediaType, id) {
+    const normalizedType = normalizeMediaType(mediaType);
+
+    try {
+      const data = await tmdbFetch(`${normalizedType}/${id}/images`, {
+        include_image_language: "en,null",
+      }, { persist: false });
+      return preferredLogo(data);
+    } catch (error) {
+      return "";
+    }
+  }
+
+  async function getTitleLogos(items = []) {
+    return Promise.all(
+      items.map(async (item) => ({
+        ...item,
+        logo: item.logo || (await getTitleLogo(item.mediaType, item.id)),
+      })),
+    );
   }
 
   function mapFallbackDetails(item) {
@@ -612,7 +750,8 @@
 
     try {
       const data = await tmdbFetch(`${normalizedType}/${id}`, {
-        append_to_response: "external_ids",
+        append_to_response: "external_ids,images",
+        include_image_language: "en,null",
       });
 
       if (data) {
@@ -863,6 +1002,7 @@
     getNewestMovies,
     getNewestSeries,
     getSeasonDetails,
+    getTitleLogos,
     getTrending,
     getTrendingThisWeek,
     getTrendingMovies,

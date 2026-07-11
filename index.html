@@ -7,108 +7,23 @@
       name="description"
       content="Watch your favorite movies and series on RainFlix."
     />
+    <meta name="theme-color" content="#030712" />
     <title>RainFlix</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              rain: {
-                ink: "#030712",
-                panel: "#08111f",
-                line: "#1f3a5f",
-                blue: "#38bdf8",
-                glow: "#60a5fa",
-              },
-            },
-          },
-        },
-      };
-    </script>
-    <style>
-      @keyframes rainflix-carousel-progress {
-        from {
-          transform: scaleX(0);
-        }
-
-        to {
-          transform: scaleX(1);
-        }
-      }
-
-      @keyframes rainflix-current-left {
-        from {
-          transform: translateX(0);
-        }
-
-        to {
-          transform: translateX(-100%);
-        }
-      }
-
-      @keyframes rainflix-next-left {
-        from {
-          transform: translateX(100%);
-        }
-
-        to {
-          transform: translateX(0);
-        }
-      }
-
-      @keyframes rainflix-current-right {
-        from {
-          transform: translateX(0);
-        }
-
-        to {
-          transform: translateX(100%);
-        }
-      }
-
-      @keyframes rainflix-next-right {
-        from {
-          transform: translateX(-100%);
-        }
-
-        to {
-          transform: translateX(0);
-        }
-      }
-
-      .rainflix-current-left {
-        animation: rainflix-current-left 520ms ease both;
-      }
-
-      .rainflix-next-left {
-        animation: rainflix-next-left 520ms ease both;
-      }
-
-      .rainflix-current-right {
-        animation: rainflix-current-right 520ms ease both;
-      }
-
-      .rainflix-next-right {
-        animation: rainflix-next-right 520ms ease both;
-      }
-
-      .rainflix-progress {
-        animation: rainflix-carousel-progress 8s linear forwards;
-        transform-origin: left center;
-      }
-    </style>
+    <link rel="preconnect" href="https://api.themoviedb.org" crossorigin />
+    <link rel="preconnect" href="https://image.tmdb.org" crossorigin />
+    <link rel="stylesheet" href="./styles/rainflix.css" />
     <script defer src="./scripts/config.js"></script>
     <script defer src="./scripts/rainflix-api.js"></script>
     <script defer src="./scripts/app.js"></script>
   </head>
 
   <body class="min-h-screen bg-rain-ink text-slate-100 antialiased">
+    <div id="ambientBackdrop" class="ambient-backdrop" aria-hidden="true"></div>
     <div
       id="app"
-      class="flex min-h-screen flex-col bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_34rem),linear-gradient(180deg,#030712_0%,#06101f_52%,#030712_100%)]"
+      class="relative z-10 flex min-h-screen flex-col"
     >
-      <div id="site-header" data-component="header"></div>
+      <div id="site-header" class="sticky top-0 z-[200]" data-component="header"></div>
       <main id="app-view" class="flex-1 outline-none" tabindex="-1"></main>
       <div id="site-footer" data-component="footer"></div>
     </div>

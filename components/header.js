@@ -2,8 +2,52 @@
   let searchHandler;
   let blurHandler;
   let resultClickHandler;
+  let resultKeyHandler;
+  let searchKeyHandler;
+  let mobileNavKeyHandler;
   let activeSearchRequest = 0;
   let debounceTimer;
+
+  function setMobileNavOpen(isOpen, returnFocus = false) {
+    const layer = document.querySelector("#mobileNavLayer");
+    const toggle = document.querySelector("#mobileNavToggle");
+
+    if (!layer || !toggle) {
+      return;
+    }
+
+    layer.classList.toggle("hidden", !isOpen);
+    layer.setAttribute("aria-hidden", String(!isOpen));
+    toggle.setAttribute("aria-expanded", String(isOpen));
+    document.body.classList.toggle("overflow-hidden", isOpen);
+
+    if (isOpen) {
+      document.querySelector("#mobileNavClose")?.focus();
+    } else if (returnFocus) {
+      toggle.focus();
+    }
+  }
+
+  window.updateHeaderRoute = function updateHeaderRoute(routeName, params = {}) {
+    let activeRoute = routeName;
+
+    if (routeName === "watch") {
+      activeRoute = params.mediaType === "tv" ? "series" : "movies";
+    }
+
+    document.querySelectorAll("[data-nav-route]").forEach((link) => {
+      const isActive = link.getAttribute("data-nav-route") === activeRoute;
+      link.classList.toggle("bg-sky-400/15", isActive);
+      link.classList.toggle("text-sky-300", isActive);
+      link.classList.toggle("text-slate-400", !isActive);
+
+      if (isActive) {
+        link.setAttribute("aria-current", "page");
+      } else {
+        link.removeAttribute("aria-current");
+      }
+    });
+  };
 
   function searchGhostRows() {
     return Array.from({ length: 3 }, () => (
@@ -38,10 +82,12 @@
 
     dropdown.innerHTML = html;
     dropdown.classList.remove("hidden");
+    document.querySelector("#globalSearch")?.setAttribute("aria-expanded", "true");
   }
 
   function hideDropdown() {
     document.querySelector("#searchDropdown")?.classList.add("hidden");
+    document.querySelector("#globalSearch")?.setAttribute("aria-expanded", "false");
   }
 
   async function runSearch(query) {
@@ -106,6 +152,14 @@
 
   window.initHeader = function initHeader() {
     const searchInput = document.querySelector("#globalSearch");
+    const mobileNavLayer = document.querySelector("#mobileNavLayer");
+    const mobileNavToggle = document.querySelector("#mobileNavToggle");
+    const mobileNavClose = document.querySelector("#mobileNavClose");
+    const mobileNavBackdrop = document.querySelector("#mobileNavBackdrop");
+
+    if (mobileNavLayer?.parentElement !== document.body) {
+      document.body.appendChild(mobileNavLayer);
+    }
 
     if (searchHandler && searchInput) {
       searchInput.removeEventListener("input", searchHandler);
@@ -119,6 +173,16 @@
       document
         .querySelector("#searchDropdown")
         ?.removeEventListener("click", resultClickHandler);
+    }
+
+    if (resultKeyHandler) {
+      document
+        .querySelector("#searchDropdown")
+        ?.removeEventListener("keydown", resultKeyHandler);
+    }
+
+    if (searchKeyHandler && searchInput) {
+      searchInput.removeEventListener("keydown", searchKeyHandler);
     }
 
     searchHandler = (event) => {
@@ -151,6 +215,24 @@
       }
     });
 
+    searchKeyHandler = (event) => {
+      if (event.key === "Escape") {
+        hideDropdown();
+        return;
+      }
+
+      if (event.key === "ArrowDown") {
+        const firstResult = document.querySelector("#searchDropdown a");
+
+        if (firstResult) {
+          event.preventDefault();
+          firstResult.focus();
+        }
+      }
+    };
+
+    searchInput?.addEventListener("keydown", searchKeyHandler);
+
     blurHandler = (event) => {
       if (!event.target.closest("#searchDropdown") && event.target !== searchInput) {
         hideDropdown();
@@ -168,8 +250,62 @@
       }
     };
 
+    resultKeyHandler = (event) => {
+      const results = [...document.querySelectorAll("#searchDropdown a")];
+      const currentIndex = results.indexOf(document.activeElement);
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        hideDropdown();
+        searchInput?.focus();
+        return;
+      }
+
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
+        return;
+      }
+
+      event.preventDefault();
+      const direction = event.key === "ArrowDown" ? 1 : -1;
+      const nextIndex = Math.min(
+        results.length - 1,
+        Math.max(0, currentIndex + direction),
+      );
+
+      if (event.key === "ArrowUp" && currentIndex === 0) {
+        searchInput?.focus();
+        return;
+      }
+
+      results[nextIndex]?.focus();
+    };
+
     document
       .querySelector("#searchDropdown")
       ?.addEventListener("click", resultClickHandler);
+    document
+      .querySelector("#searchDropdown")
+      ?.addEventListener("keydown", resultKeyHandler);
+
+    mobileNavToggle?.addEventListener("click", () => setMobileNavOpen(true));
+    mobileNavClose?.addEventListener("click", () => setMobileNavOpen(false, true));
+    mobileNavBackdrop?.addEventListener("click", () => setMobileNavOpen(false, true));
+    document.querySelector("#mobileNavLayer")?.addEventListener("click", (event) => {
+      if (event.target.closest("a")) {
+        setMobileNavOpen(false);
+      }
+    });
+
+    mobileNavKeyHandler = (event) => {
+      if (
+        event.key === "Escape" &&
+        document.querySelector("#mobileNavToggle")?.getAttribute("aria-expanded") ===
+          "true"
+      ) {
+        setMobileNavOpen(false, true);
+      }
+    };
+
+    document.addEventListener("keydown", mobileNavKeyHandler);
   };
 })();

@@ -1,0 +1,13 @@
+{
+  "name": "rainflix",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npm run build:css",
+    "build:css": "tailwindcss -i ./styles/input.css -o ./styles/rainflix.css --minify",
+    "watch:css": "tailwindcss -i ./styles/input.css -o ./styles/rainflix.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}

@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --rainflix-parallax-y: 0px;
+  color-scheme: dark;
+  scrollbar-color: #1f6f9b #030712;
+  scrollbar-width: thin;
+}
+
+body {
+  background: linear-gradient(180deg, #030712 0%, #07111e 48%, #030712 100%);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 9px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #030712;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 2px solid #030712;
+  border-radius: 999px;
+  background: #1f6f9b;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #38bdf8;
+}
+
+.ambient-backdrop {
+  position: fixed;
+  inset: -5vh -3vw;
+  z-index: 0;
+  pointer-events: none;
+  background-position: center top;
+  background-size: cover;
+  filter: saturate(0.8) contrast(1.08);
+  opacity: 0;
+  transform: translate3d(0, var(--rainflix-parallax-y), 0) scale(1.06);
+  transition: opacity 700ms ease;
+  will-change: transform;
+}
+
+.ambient-backdrop.is-visible {
+  opacity: 0.18;
+}
+
+.catalog-card {
+  box-shadow:
+    0 18px 44px rgb(0 0 0 / 48%),
+    0 1px 0 rgb(125 211 252 / 8%);
+}
+
+.title-logo {
+  filter: drop-shadow(0 3px 12px rgb(0 0 0 / 72%));
+}
+
+@keyframes rainflix-carousel-progress {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes rainflix-current-left {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes rainflix-next-left {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes rainflix-current-right {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes rainflix-next-right {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+.rainflix-current-left {
+  animation: rainflix-current-left 520ms ease both;
+}
+
+.rainflix-next-left {
+  animation: rainflix-next-left 520ms ease both;
+}
+
+.rainflix-current-right {
+  animation: rainflix-current-right 520ms ease both;
+}
+
+.rainflix-next-right {
+  animation: rainflix-next-right 520ms ease both;
+}
+
+.rainflix-progress {
+  animation: rainflix-carousel-progress 8s linear forwards;
+  transform-origin: left center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .ambient-backdrop {
+    transform: scale(1.06);
+  }
+}

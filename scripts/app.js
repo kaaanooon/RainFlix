@@ -1,11 +1,25 @@
 (function () {
   const loadedScripts = new Set();
+  let activeRouteRequest = 0;
 
   const routes = {
     home: {
       html: "./pages/home.html",
       script: "./pages/home.js",
       init: "initHomePage",
+      destroy: "destroyHomePage",
+    },
+    movies: {
+      html: "./pages/home.html",
+      script: "./pages/home.js",
+      init: "initHomePage",
+      destroy: "destroyHomePage",
+    },
+    series: {
+      html: "./pages/home.html",
+      script: "./pages/home.js",
+      init: "initHomePage",
+      destroy: "destroyHomePage",
     },
     watch: {
       html: "./pages/watch.html",
@@ -51,6 +65,25 @@
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }
 
+  function setAmbientBackdrop(imageUrl) {
+    const backdrop = document.querySelector("#ambientBackdrop");
+
+    if (!backdrop || !imageUrl) {
+      return;
+    }
+
+    backdrop.style.backgroundImage = `url("${String(imageUrl).replace(/"/g, "%22")}")`;
+    backdrop.classList.add("is-visible");
+  }
+
+  function updateParallaxPosition() {
+    const offset = Math.min(window.scrollY * 0.055, 90);
+    document.documentElement.style.setProperty(
+      "--rainflix-parallax-y",
+      `-${offset}px`,
+    );
+  }
+
   function handleImmediateTitleScroll(event) {
     const link = event.target.closest('a[href^="#watch/"]');
 
@@ -70,20 +103,27 @@
     }
   }
 
-  async function injectHtml(selector, path) {
+  async function injectHtml(selector, path, requestId = 0) {
     const container = document.querySelector(selector);
 
     if (!container) {
       return;
     }
 
-    const response = await fetch(path, { cache: "no-store" });
+    const response = await fetch(path, { cache: "no-cache" });
 
     if (!response.ok) {
       throw new Error(`Unable to load ${path}`);
     }
 
-    container.innerHTML = await response.text();
+    const html = await response.text();
+
+    if (requestId && requestId !== activeRouteRequest) {
+      return false;
+    }
+
+    container.innerHTML = html;
+    return true;
   }
 
   function loadScript(path) {
@@ -113,33 +153,64 @@
   }
 
   async function loadRoute() {
+    const requestId = ++activeRouteRequest;
     const currentRoute = getRoute();
     const { routeName, params } = currentRoute;
     const route = routes[routeName];
     const scrollToTop = shouldScrollToTop(currentRoute);
+    const previousRouteName = window.RainFlixCurrentRoute?.routeName;
+
+    window.updateHeaderRoute?.(routeName, params);
+
+    if (previousRouteName && previousRouteName !== routeName) {
+      const destroyName = routes[previousRouteName]?.destroy;
+      window[destroyName]?.();
+    }
 
     if (scrollToTop) {
       scrollToTopNow();
     }
 
-    await injectHtml("#app-view", route.html);
+    const appView = document.querySelector("#app-view");
+    appView?.setAttribute("aria-busy", "true");
+
+    const routeInjected = await injectHtml("#app-view", route.html, requestId);
+
+    if (!routeInjected) {
+      return;
+    }
+
     await loadScript(route.script);
-    const initResult = window[route.init]?.({ routeName, params });
+
+    if (requestId !== activeRouteRequest) {
+      return;
+    }
+
+    const initResult = window[route.init]?.({
+      routeName,
+      params,
+      isCurrent: () => requestId === activeRouteRequest,
+    });
 
     if (initResult && typeof initResult.then === "function") {
       await initResult;
     }
 
+    if (requestId !== activeRouteRequest) {
+      return;
+    }
+
     window.RainFlixCurrentRoute = currentRoute;
+    appView?.setAttribute("aria-busy", "false");
 
-    document.querySelector("#app-view")?.focus({ preventScroll: true });
-
+    appView?.focus({ preventScroll: true });
   }
 
   function renderLoadError(error) {
     const appView = document.querySelector("#app-view");
 
     if (appView) {
+      appView.setAttribute("aria-busy", "false");
       appView.innerHTML = `
         <section class="mx-auto my-20 w-[min(680px,calc(100%-2rem))] rounded-lg border border-blue-900/70 bg-blue-950/30 p-7 text-slate-400">
           <h1 class="m-0 mb-3 text-2xl font-black text-slate-50">RainFlix could not load this view.</h1>
@@ -159,10 +230,13 @@
       window.addEventListener("hashchange", () => {
         loadRoute().catch(renderLoadError);
       });
+      window.addEventListener("scroll", updateParallaxPosition, { passive: true });
+      updateParallaxPosition();
     } catch (error) {
       renderLoadError(error);
     }
   }
 
   document.addEventListener("DOMContentLoaded", initApp);
+  window.RainFlixSetBackdrop = setAmbientBackdrop;
 })();
