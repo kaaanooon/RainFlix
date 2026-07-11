@@ -437,10 +437,6 @@
         : "rainflix-next-right"
       : "";
 
-    window.RainFlixSetBackdrop?.(
-      item.backdrop || item.poster || imageFallback(item.title, true),
-    );
-
     carousel.innerHTML = `
       <div class="relative h-full overflow-hidden">
         <div class="absolute left-0 right-0 top-0 z-10 h-1 bg-blue-950/80">
@@ -605,6 +601,16 @@
     state.carouselChanging = false;
     state.pendingSlide = 0;
     state.slideDirection = "left";
+
+    const featuredItem = state.carouselItems[0];
+
+    if (featuredItem) {
+      window.RainFlixSetBackdrop?.(
+        featuredItem.backdrop ||
+          featuredItem.poster ||
+          imageFallback(featuredItem.title, true),
+      );
+    }
 
     renderCarousel();
     renderFeedMeta();

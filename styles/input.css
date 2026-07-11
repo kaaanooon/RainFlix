@@ -33,14 +33,18 @@ body {
 
 .ambient-backdrop {
   position: fixed;
-  inset: -5vh -3vw;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100lvh;
   z-index: 0;
   pointer-events: none;
   background-position: center top;
   background-size: cover;
   filter: saturate(0.8) contrast(1.08);
   opacity: 0;
-  transform: scale(1.06);
+  transform: scale(1.03);
   transition: opacity 700ms ease;
 }
 
@@ -144,6 +148,6 @@ body {
   }
 
   .ambient-backdrop {
-    transform: scale(1.06);
+    transform: scale(1.03);
   }
 }
