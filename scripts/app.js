@@ -76,14 +76,6 @@
     backdrop.classList.add("is-visible");
   }
 
-  function updateParallaxPosition() {
-    const offset = Math.min(window.scrollY * 0.055, 90);
-    document.documentElement.style.setProperty(
-      "--rainflix-parallax-y",
-      `-${offset}px`,
-    );
-  }
-
   function handleImmediateTitleScroll(event) {
     const link = event.target.closest('a[href^="#watch/"]');
 
@@ -230,8 +222,6 @@
       window.addEventListener("hashchange", () => {
         loadRoute().catch(renderLoadError);
       });
-      window.addEventListener("scroll", updateParallaxPosition, { passive: true });
-      updateParallaxPosition();
     } catch (error) {
       renderLoadError(error);
     }

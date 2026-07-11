@@ -3,7 +3,6 @@
 @tailwind utilities;
 
 :root {
-  --rainflix-parallax-y: 0px;
   color-scheme: dark;
   scrollbar-color: #1f6f9b #030712;
   scrollbar-width: thin;
@@ -41,9 +40,8 @@ body {
   background-size: cover;
   filter: saturate(0.8) contrast(1.08);
   opacity: 0;
-  transform: translate3d(0, var(--rainflix-parallax-y), 0) scale(1.06);
+  transform: scale(1.06);
   transition: opacity 700ms ease;
-  will-change: transform;
 }
 
 .ambient-backdrop.is-visible {
