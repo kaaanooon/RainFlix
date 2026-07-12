@@ -6,6 +6,8 @@
     tmdbRegion: "US",
     tmdbCacheTtlMs: 900000,
     tmdbCacheMaxEntries: 60,
+    appReadyMinimumMs: 2400,
+    appReadyTimeoutMs: 3500,
     vidsrcEmbedBaseUrl: "https://vidsrc.to/embed",
     twoEmbedBaseUrl: "https://www.2embed.cc/embed",
     multiEmbedBaseUrl: "https://multiembed.mov",

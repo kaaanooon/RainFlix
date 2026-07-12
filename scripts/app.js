@@ -1,6 +1,11 @@
 (function () {
+  const LOADER_POSTER_CACHE_KEY = "rainflix:loader-posters:v1";
   const loadedScripts = new Set();
   let activeRouteRequest = 0;
+  let hasBootCompleted = false;
+  let loaderFallbackTimer;
+  let loaderHideTimer;
+  let loaderShownAt = 0;
 
   const routes = {
     home: {
@@ -63,6 +68,165 @@
 
   function scrollToTopNow() {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }
+
+  function loaderTimeout() {
+    return Math.max(
+      3000,
+      Number(window.RAINFLIX_CONFIG?.appReadyTimeoutMs) || 3500,
+    );
+  }
+
+  function loaderMinimumDuration() {
+    return Math.max(
+      1200,
+      Number(window.RAINFLIX_CONFIG?.appReadyMinimumMs) || 2400,
+    );
+  }
+
+  function escapeAttribute(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function cachedLoaderPosters() {
+    try {
+      const posters = JSON.parse(
+        window.localStorage.getItem(LOADER_POSTER_CACHE_KEY) || "[]",
+      );
+      return Array.isArray(posters) ? posters : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function cacheLoaderPosters(posters) {
+    try {
+      window.localStorage.setItem(
+        LOADER_POSTER_CACHE_KEY,
+        JSON.stringify([...new Set(posters.filter(Boolean))].slice(0, 35)),
+      );
+    } catch (error) {
+      // Poster caching is optional when storage is unavailable.
+    }
+  }
+
+  function populateAppLoader(posters = [], options = {}) {
+    const wall = document.querySelector("#appLoaderWall");
+    const uniquePosters = [...new Set(posters.filter(Boolean))];
+
+    if (options.cache !== false && uniquePosters.length) {
+      cacheLoaderPosters(uniquePosters);
+    }
+
+    if (
+      !wall ||
+      hasBootCompleted ||
+      wall.dataset.populated === "true" ||
+      !uniquePosters.length
+    ) {
+      return;
+    }
+
+    wall.dataset.populated = "true";
+    const columnCount = 7;
+    const cardsPerColumn = 5;
+    wall.innerHTML = Array.from({ length: columnCount }, (_, columnIndex) => {
+      const cards = Array.from({ length: cardsPerColumn }, (_, cardIndex) => {
+        const posterIndex =
+          (columnIndex * cardsPerColumn + cardIndex * 3) % uniquePosters.length;
+        return `
+          <div class="app-loader-card">
+            <img src="${escapeAttribute(uniquePosters[posterIndex])}" alt="" loading="eager" decoding="async" draggable="false" />
+          </div>
+        `;
+      }).join("");
+      const direction = columnIndex % 2 === 0 ? "up" : "down";
+
+      return `
+        <div class="app-loader-column app-loader-column-${direction}">
+          <div class="app-loader-column-track">
+            <div class="app-loader-sequence">${cards}</div>
+            <div class="app-loader-sequence" aria-hidden="true">${cards}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    const images = [...wall.querySelectorAll("img")];
+    Promise.all(
+      images.map(
+        (image) =>
+          new Promise((resolve) => {
+            if (image.complete) {
+              resolve();
+              return;
+            }
+
+            image.addEventListener("load", resolve, { once: true });
+            image.addEventListener("error", resolve, { once: true });
+          }),
+      ),
+    ).then(() => {
+      if (!hasBootCompleted) {
+        wall.classList.add("is-ready");
+      }
+    });
+  }
+
+  function hideAppLoader(requestId, force = false) {
+    const loader = document.querySelector("#appLoader");
+
+    if (
+      !loader ||
+      hasBootCompleted ||
+      (!force && String(requestId) !== loader.dataset.requestId)
+    ) {
+      return;
+    }
+
+    const finish = () => {
+      hasBootCompleted = true;
+      document.documentElement.classList.remove("app-is-loading");
+      loader.classList.add("is-hidden");
+      loader.setAttribute("aria-hidden", "true");
+    };
+    const elapsed = performance.now() - loaderShownAt;
+    const remaining = force
+      ? 0
+      : Math.max(0, loaderMinimumDuration() - elapsed);
+
+    window.clearTimeout(loaderFallbackTimer);
+    window.clearTimeout(loaderHideTimer);
+
+    if (remaining > 0) {
+      loaderHideTimer = window.setTimeout(finish, remaining);
+    } else {
+      finish();
+    }
+  }
+
+  function showAppLoader(requestId) {
+    const loader = document.querySelector("#appLoader");
+
+    if (!loader || hasBootCompleted) {
+      return;
+    }
+
+    window.clearTimeout(loaderFallbackTimer);
+    window.clearTimeout(loaderHideTimer);
+    loaderShownAt ||= performance.now();
+    document.documentElement.classList.add("app-is-loading");
+    loader.dataset.requestId = String(requestId);
+    loader.classList.remove("is-hidden");
+    loader.setAttribute("aria-hidden", "false");
+    loaderFallbackTimer = window.setTimeout(
+      () => hideAppLoader(requestId),
+      loaderTimeout(),
+    );
   }
 
   function setAmbientBackdrop(imageUrl) {
@@ -146,6 +310,9 @@
 
   async function loadRoute() {
     const requestId = ++activeRouteRequest;
+    if (!hasBootCompleted) {
+      showAppLoader(requestId);
+    }
     const currentRoute = getRoute();
     const { routeName, params } = currentRoute;
     const route = routes[routeName];
@@ -178,6 +345,8 @@
       return;
     }
 
+    window.RainFlixCurrentRoute = currentRoute;
+
     const initResult = window[route.init]?.({
       routeName,
       params,
@@ -192,8 +361,8 @@
       return;
     }
 
-    window.RainFlixCurrentRoute = currentRoute;
     appView?.setAttribute("aria-busy", "false");
+    hideAppLoader(requestId);
 
     appView?.focus({ preventScroll: true });
   }
@@ -211,9 +380,20 @@
         </section>
       `;
     }
+
+    hideAppLoader(activeRouteRequest, true);
   }
 
   async function initApp() {
+    showAppLoader("boot");
+    const savedPosters = cachedLoaderPosters();
+    populateAppLoader(
+      savedPosters.length
+        ? savedPosters
+        : window.RainFlixApi?.getLoaderPosters?.(28),
+      { cache: false },
+    );
+
     try {
       await loadShell();
       await loadRoute();
@@ -222,6 +402,11 @@
       window.addEventListener("hashchange", () => {
         loadRoute().catch(renderLoadError);
       });
+      document.addEventListener("dragstart", (event) => {
+        if (event.target instanceof HTMLImageElement) {
+          event.preventDefault();
+        }
+      });
     } catch (error) {
       renderLoadError(error);
     }
@@ -229,4 +414,5 @@
 
   document.addEventListener("DOMContentLoaded", initApp);
   window.RainFlixSetBackdrop = setAmbientBackdrop;
+  window.RainFlixPopulateLoader = populateAppLoader;
 })();

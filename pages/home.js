@@ -26,6 +26,38 @@
   };
 
   const BROWSE_ROWS_PER_BATCH = 5;
+  const TITLE_LOGO_WAIT_MS = 2600;
+
+  function wait(duration) {
+    return new Promise((resolve) => window.setTimeout(resolve, duration));
+  }
+
+  function preloadImage(url) {
+    if (!url) {
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      const image = new Image();
+      image.onload = resolve;
+      image.onerror = resolve;
+      image.src = url;
+
+      if (image.complete) {
+        resolve();
+      }
+    });
+  }
+
+  async function prepareTitleLogos(items) {
+    const itemsWithLogos = await api().getTitleLogos(items);
+    await Promise.all(
+      itemsWithLogos
+        .filter((item) => item.logo)
+        .map((item) => preloadImage(item.logo)),
+    );
+    return itemsWithLogos;
+  }
 
   function api() {
     return window.RainFlixApi;
@@ -41,7 +73,7 @@
 
   function browseColumnCount() {
     if (window.matchMedia("(min-width: 768px)").matches) {
-      return 5;
+      return 6;
     }
 
     if (window.matchMedia("(min-width: 640px)").matches) {
@@ -593,6 +625,15 @@
     state.trending = trendingFeed.items || [];
     state.newestMovies = movieFeed.items || [];
     state.newestSeries = seriesFeed.items || [];
+    window.RainFlixPopulateLoader?.(
+      [
+        ...state.carouselItems,
+        ...state.trending,
+        ...state.newestMovies,
+        ...state.newestSeries,
+      ].map((item) => item.poster || item.backdrop),
+    );
+    const titleLogosPromise = prepareTitleLogos(state.carouselItems);
 
     const visibleFeeds = [carouselFeed, trendingFeed, movieFeed, seriesFeed];
 
@@ -619,20 +660,29 @@
     renderGrid("#newestSeriesGrid", state.newestSeries, "No newest series found.");
     startCarouselTimer();
     setupBrowseObserver();
-    await loadMoreBrowseItems();
+    const [itemsWithLogos] = await Promise.all([
+      Promise.race([
+        titleLogosPromise,
+        wait(TITLE_LOGO_WAIT_MS).then(() => null),
+      ]),
+      loadMoreBrowseItems(),
+    ]);
 
-    api()
-      .getTitleLogos(state.carouselItems)
-      .then((items) => {
-        if (loadId !== state.carouselLoadId || !items.length) {
-          return;
-        }
+    const applyTitleLogos = (items) => {
+      if (loadId !== state.carouselLoadId || !items?.length) {
+        return;
+      }
 
-        state.carouselItems = items;
-        renderCarousel();
-        startCarouselTimer();
-      })
-      .catch(() => {});
+      state.carouselItems = items;
+      renderCarousel();
+      startCarouselTimer();
+    };
+
+    if (itemsWithLogos) {
+      applyTitleLogos(itemsWithLogos);
+    } else {
+      titleLogosPromise.then(applyTitleLogos).catch(() => {});
+    }
   }
 
   window.initHomePage = function initHomePage(context = {}) {

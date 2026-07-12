@@ -9,6 +9,9 @@
     />
     <meta name="theme-color" content="#030712" />
     <title>RainFlix</title>
+    <link rel="icon" type="image/png" href="./assets/rainflix-r.png" />
+    <link rel="preload" as="image" href="./assets/rainflix-r.png" />
+    <link rel="preload" as="image" href="./assets/rainflix-wordmark.png" />
     <link rel="preconnect" href="https://api.themoviedb.org" crossorigin />
     <link rel="preconnect" href="https://image.tmdb.org" crossorigin />
     <link rel="stylesheet" href="./styles/rainflix.css" />
@@ -18,6 +21,21 @@
   </head>
 
   <body class="min-h-screen bg-rain-ink text-slate-100 antialiased">
+    <div id="appLoader" class="app-loader" role="status" aria-live="polite">
+      <div class="app-loader-scene" aria-hidden="true">
+        <div id="appLoaderWall" class="app-loader-wall"></div>
+      </div>
+      <div class="app-loader-vignette" aria-hidden="true"></div>
+      <div class="app-loader-content">
+        <div class="app-loader-emblem">
+          <img class="app-loader-logo" src="./assets/rainflix-r.png" alt="" draggable="false" />
+        </div>
+        <div class="app-loader-track" aria-hidden="true">
+          <div class="app-loader-bar"></div>
+        </div>
+        <span class="sr-only">Loading RainFlix</span>
+      </div>
+    </div>
     <div id="ambientBackdrop" class="ambient-backdrop" aria-hidden="true"></div>
     <div
       id="app"

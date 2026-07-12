@@ -242,9 +242,12 @@
     },
   ];
 
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 12;
   const TMDB_CACHE_PREFIX = "rainflix:tmdb:v1:";
+  const TITLE_LOGO_CACHE_KEY = "rainflix:title-logos:v1";
+  const TITLE_LOGO_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
   const inFlightTmdbRequests = new Map();
+  let titleLogoCache;
 
   function config() {
     return window.RAINFLIX_CONFIG || {};
@@ -307,6 +310,38 @@
       pruneTmdbCache();
     } catch (error) {
       // A full or disabled cache should never prevent the catalog from loading.
+    }
+  }
+
+  function readTitleLogoCache() {
+    if (titleLogoCache) {
+      return titleLogoCache;
+    }
+
+    try {
+      const cache = JSON.parse(
+        window.localStorage.getItem(TITLE_LOGO_CACHE_KEY) || "{}",
+      );
+      titleLogoCache = cache && typeof cache === "object" ? cache : {};
+    } catch (error) {
+      titleLogoCache = {};
+    }
+
+    return titleLogoCache;
+  }
+
+  function writeTitleLogoCache(cache) {
+    try {
+      const entries = Object.entries(cache)
+        .sort(([, left], [, right]) => (right.storedAt || 0) - (left.storedAt || 0))
+        .slice(0, 100);
+      titleLogoCache = Object.fromEntries(entries);
+      window.localStorage.setItem(
+        TITLE_LOGO_CACHE_KEY,
+        JSON.stringify(titleLogoCache),
+      );
+    } catch (error) {
+      // Logo caching is optional when storage is unavailable.
     }
   }
 
@@ -507,12 +542,26 @@
 
   async function getTitleLogo(mediaType, id) {
     const normalizedType = normalizeMediaType(mediaType);
+    const cacheKey = `${normalizedType}:${id}`;
+    const logoCache = readTitleLogoCache();
+    const cached = logoCache[cacheKey];
+
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.url || "";
+    }
 
     try {
       const data = await tmdbFetch(`${normalizedType}/${id}/images`, {
         include_image_language: "en,null",
       }, { persist: false });
-      return preferredLogo(data);
+      const url = preferredLogo(data);
+      logoCache[cacheKey] = {
+        url,
+        expiresAt: Date.now() + TITLE_LOGO_CACHE_TTL,
+        storedAt: Date.now(),
+      };
+      writeTitleLogoCache(logoCache);
+      return url;
     } catch (error) {
       return "";
     }
@@ -556,6 +605,16 @@
     }
 
     return [...FALLBACK_TITLES];
+  }
+
+  function getLoaderPosters(limit = 28) {
+    const posters = FALLBACK_TITLES.map((item) => item.poster).filter(Boolean);
+
+    if (!posters.length) {
+      return [];
+    }
+
+    return Array.from({ length: limit }, (_, index) => posters[index % posters.length]);
   }
 
   function fallbackPage(filter, page, limit = PAGE_SIZE) {
@@ -999,6 +1058,7 @@
     createImageFallback,
     escapeHtml,
     getDetails,
+    getLoaderPosters,
     getNewestMovies,
     getNewestSeries,
     getSeasonDetails,
