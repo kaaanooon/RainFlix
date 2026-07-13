@@ -254,12 +254,12 @@
     state.playerSource = activeSource.id;
 
     shell.innerHTML = `
-      <div class="player-frame relative aspect-video w-full overflow-hidden bg-black" data-player-frame>
+      <div class="player-frame group relative aspect-video w-full overflow-hidden bg-black" data-player-frame>
         <div class="absolute inset-0 grid place-items-center bg-slate-950" data-player-loading aria-hidden="true">
           <div class="h-8 w-8 animate-spin rounded-full border-2 border-blue-950 border-t-sky-400"></div>
         </div>
         <button
-          class="absolute right-3 top-3 z-20 grid h-10 w-10 place-items-center rounded-lg border border-white/15 bg-black/70 text-xl text-white shadow-xl backdrop-blur transition hover:bg-black/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+          class="absolute right-3 top-3 z-20 grid h-10 w-10 place-items-center rounded-lg border border-white/15 bg-black/70 text-xl text-white opacity-0 shadow-xl backdrop-blur transition duration-200 group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-black/90 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
           type="button"
           data-player-fullscreen
           aria-label="Enter fullscreen"
