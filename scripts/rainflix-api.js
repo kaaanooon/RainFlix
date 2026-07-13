@@ -970,6 +970,39 @@
     return fallback ? mapFallbackDetails(fallback) : null;
   }
 
+  async function getSimilar(mediaType, id, limit = PAGE_SIZE) {
+    const normalizedType = normalizeMediaType(mediaType);
+
+    try {
+      const data = await tmdbFetch(`${normalizedType}/${id}/similar`, {
+        page: 1,
+      });
+
+      if (data) {
+        return {
+          items: (data.results || [])
+            .map((item) => mapTmdbTitle(item, normalizedType))
+            .filter(
+              (item) =>
+                String(item.id) !== String(id) &&
+                (item.poster || item.backdrop),
+            )
+            .slice(0, limit),
+          source: "tmdb",
+        };
+      }
+    } catch (error) {
+      console.warn(error);
+    }
+
+    return {
+      items: fallbackItems(normalizedType)
+        .filter((item) => String(item.id) !== String(id))
+        .slice(0, limit),
+      source: "demo",
+    };
+  }
+
   async function getSeasonDetails(id, seasonNumber = 1) {
     const cleanSeason = Number.parseInt(seasonNumber, 10) || 1;
 
@@ -1332,6 +1365,7 @@
     getNewestMovies,
     getNewestSeries,
     getSeasonDetails,
+    getSimilar,
     getTitleLogos,
     getTrending,
     getTrendingThisWeek,

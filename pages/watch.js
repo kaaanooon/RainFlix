@@ -5,6 +5,7 @@
     playerSource: "vidsrc",
     season: 1,
     seasonDetails: null,
+    similarItems: [],
   };
 
   const PLAYER_STORAGE_KEY = "rainflix:player-source";
@@ -178,6 +179,63 @@
           : ""
       }
     `;
+  }
+
+  function similarCardTemplate(item) {
+    const poster = item.poster || item.backdrop || imageFallback(item.title);
+    const watchUrl = api().buildWatchUrl(item);
+
+    return `
+      <a
+        class="catalog-card group block overflow-hidden rounded-lg border border-blue-900/70 bg-slate-950 outline-none transition hover:-translate-y-1 hover:border-sky-500/70 focus-visible:-translate-y-1 focus-visible:border-sky-500/70 focus-visible:ring-4 focus-visible:ring-sky-400/20"
+        href="${watchUrl}"
+        aria-label="Watch ${escapeHtml(item.title)}"
+      >
+        <div class="relative isolate aspect-[2/3] overflow-hidden">
+          <img
+            class="h-full w-full object-cover transition duration-300 group-hover:scale-105 group-hover:brightness-[0.58] group-focus-visible:scale-105 group-focus-visible:brightness-[0.58]"
+            src="${poster}"
+            alt="${escapeHtml(item.title)} poster"
+            loading="lazy"
+            decoding="async"
+            onerror="this.onerror=null;this.src='${imageFallback(item.title)}';"
+          />
+          <div class="absolute inset-0 flex translate-y-3 flex-col justify-end gap-3 bg-gradient-to-t from-slate-950 via-slate-950/78 to-transparent p-4 opacity-0 transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">
+            <h3 class="text-xl font-black leading-tight text-slate-50">${escapeHtml(item.title)}</h3>
+            <p class="line-clamp-3 text-xs leading-5 text-slate-300 md:line-clamp-4 md:text-sm md:leading-6">${escapeHtml(item.synopsis)}</p>
+          </div>
+        </div>
+        <div class="space-y-2 p-3">
+          <h3 class="truncate text-sm font-black text-slate-50">${escapeHtml(item.title)}</h3>
+          <div class="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+            <span class="rounded-full bg-blue-500/20 px-2 py-1 font-black text-sky-200">${escapeHtml(item.rating)}</span>
+            <span>${escapeHtml(item.year)}</span>
+            <span class="rounded-full bg-sky-400/15 px-2 py-1 font-black uppercase text-sky-300">${api().mediaLabel(item.mediaType)}</span>
+          </div>
+        </div>
+      </a>
+    `;
+  }
+
+  function renderSimilarSection() {
+    const section = document.querySelector("#similarSection");
+    const grid = document.querySelector("#similarGrid");
+
+    if (!section || !grid) {
+      return;
+    }
+
+    if (!state.similarItems.length) {
+      section.classList.add("hidden");
+      grid.innerHTML = "";
+      return;
+    }
+
+    section.classList.remove("hidden");
+    grid.innerHTML = state.similarItems
+      .slice(0, api().PAGE_SIZE)
+      .map(similarCardTemplate)
+      .join("");
   }
 
   function currentFullscreenElement() {
@@ -464,7 +522,13 @@
     }
 
     const normalizedType = api().normalizeMediaType(mediaType);
-    const details = await api().getDetails(normalizedType, id);
+    const detailsPromise = api().getDetails(normalizedType, id);
+    const similarPromise = api().getSimilar(
+      normalizedType,
+      id,
+      api().PAGE_SIZE,
+    );
+    const details = await detailsPromise;
 
     if (!isCurrent()) {
       return;
@@ -487,6 +551,7 @@
     state.season = Number.parseInt(season, 10) || 1;
     state.episode = Number.parseInt(episode, 10) || 1;
     state.seasonDetails = null;
+    state.similarItems = [];
 
     if (details.mediaType === "tv") {
       const seasonExists = details.seasons.some(
@@ -505,10 +570,19 @@
       state.episode = episodeExists ? state.episode : 1;
     }
 
+    const similarFeed = await similarPromise;
+
+    if (!isCurrent()) {
+      return;
+    }
+
+    state.similarItems = similarFeed.items || [];
+
     renderHero();
     renderPlayer();
     renderDetailsPanel();
     renderEpisodeSection();
+    renderSimilarSection();
     showContent();
   };
 
