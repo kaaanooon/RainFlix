@@ -32,6 +32,12 @@
       init: "initHomePage",
       destroy: "destroyHomePage",
     },
+    year: {
+      html: "./pages/home.html",
+      script: "./pages/home.js",
+      init: "initHomePage",
+      destroy: "destroyHomePage",
+    },
     watch: {
       html: "./pages/watch.html",
       script: "./pages/watch.js",
@@ -53,6 +59,7 @@
         season: parts[3] || "1",
         episode: parts[4] || "1",
         genre: routeName === "genre" ? parts[1] || "" : "",
+        year: routeName === "year" ? parts[1] || "" : "",
       },
     };
   }

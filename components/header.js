@@ -1,104 +1,7 @@
 (function () {
-  let searchHandler;
-  let blurHandler;
-  let resultClickHandler;
-  let resultKeyHandler;
-  let searchKeyHandler;
-  let mobileNavKeyHandler;
   let activeSearchRequest = 0;
   let debounceTimer;
-  let genreFocusTimer;
-
-  function setMobileNavOpen(isOpen, returnFocus = false) {
-    const layer = document.querySelector("#mobileNavLayer");
-    const toggle = document.querySelector("#mobileNavToggle");
-
-    if (!layer || !toggle) {
-      return;
-    }
-
-    layer.classList.toggle("hidden", !isOpen);
-    layer.setAttribute("aria-hidden", String(!isOpen));
-    toggle.setAttribute("aria-expanded", String(isOpen));
-    document.body.classList.toggle("overflow-hidden", isOpen);
-
-    if (isOpen) {
-      document.querySelector("#mobileNavClose")?.focus();
-    } else if (returnFocus) {
-      toggle.focus();
-    }
-  }
-
-  function setDesktopGenreOpen(isOpen) {
-    const menu = document.querySelector("#desktopGenreMenu");
-    const toggle = document.querySelector("#desktopGenreToggle");
-    const dropdown = document.querySelector("#desktopGenreDropdown");
-
-    menu?.classList.toggle("is-open", isOpen);
-    toggle?.setAttribute("aria-expanded", String(isOpen));
-    dropdown?.setAttribute("aria-hidden", String(!isOpen));
-  }
-
-  function setMobileGenreOpen(isOpen) {
-    const list = document.querySelector("#mobileGenreList");
-    const toggle = document.querySelector("#mobileGenreToggle");
-    const arrow = document.querySelector("[data-mobile-genre-arrow]");
-
-    list?.classList.toggle("hidden", !isOpen);
-    list?.setAttribute("aria-hidden", String(!isOpen));
-    toggle?.setAttribute("aria-expanded", String(isOpen));
-    arrow?.classList.toggle("rotate-180", isOpen);
-  }
-
-  window.updateHeaderRoute = function updateHeaderRoute(routeName, params = {}) {
-    let activeRoute = routeName;
-
-    if (routeName === "watch") {
-      activeRoute = params.mediaType === "tv" ? "series" : "movies";
-    }
-
-    document.querySelectorAll("[data-nav-route]").forEach((link) => {
-      const isActive = link.getAttribute("data-nav-route") === activeRoute;
-      link.classList.toggle("bg-sky-400/15", isActive);
-      link.classList.toggle("text-sky-300", isActive);
-      link.classList.toggle("text-slate-400", !isActive);
-
-      if (isActive) {
-        link.setAttribute("aria-current", "page");
-      } else {
-        link.removeAttribute("aria-current");
-      }
-    });
-
-    document.querySelectorAll("[data-genre-slug]").forEach((link) => {
-      const isActive =
-        routeName === "genre" &&
-        link.getAttribute("data-genre-slug") === params.genre;
-      link.classList.toggle("bg-sky-400/15", isActive);
-      link.classList.toggle("text-sky-300", isActive);
-      link.classList.toggle("text-slate-300", !isActive);
-
-      if (isActive) {
-        link.setAttribute("aria-current", "page");
-      } else {
-        link.removeAttribute("aria-current");
-      }
-    });
-
-    setMobileGenreOpen(routeName === "genre");
-  };
-
-  function searchGhostRows() {
-    return Array.from({ length: 3 }, () => (
-      `<div class="flex gap-3 border-b border-blue-950/70 p-3 last:border-b-0">
-        <div class="h-16 w-11 shrink-0 animate-pulse rounded bg-blue-950/70"></div>
-        <div class="min-w-0 flex-1 pt-1">
-          <div class="h-4 w-3/4 animate-pulse rounded bg-blue-950/70"></div>
-          <div class="mt-3 h-3 w-1/2 animate-pulse rounded bg-blue-950/50"></div>
-        </div>
-      </div>`
-    )).join("");
-  }
+  const menuFocusTimers = new Map();
 
   function escapeHtml(value) {
     return window.RainFlixApi?.escapeHtml
@@ -112,42 +15,202 @@
       : "";
   }
 
-  function renderGenreMenus() {
-    const genres = window.RainFlixApi?.GENRES || [];
-    const desktopList = document.querySelector("#desktopGenreList");
-    const mobileList = document.querySelector("#mobileGenreList");
+  function setMobileNavOpen(isOpen, returnFocus = false) {
+    const layer = document.querySelector("#mobileNavLayer");
+    const toggle = document.querySelector("#mobileNavToggle");
 
-    if (desktopList) {
-      desktopList.innerHTML = genres
-        .map(
-          (genre) => `
-            <a
-              class="rounded-lg px-3 py-2 text-sm font-bold text-slate-300 transition hover:bg-sky-400/10 hover:text-sky-200 focus-visible:bg-sky-400/10 focus-visible:text-sky-200 focus-visible:outline-none"
-              href="#genre/${encodeURIComponent(genre.slug)}"
-              data-genre-slug="${escapeHtml(genre.slug)}"
-              role="menuitem"
-            >
-              ${escapeHtml(genre.name)}
-            </a>
-          `,
-        )
-        .join("");
+    if (!layer || !toggle) {
+      return;
     }
 
-    if (mobileList) {
-      mobileList.innerHTML = genres
-        .map(
-          (genre) => `
-            <a
-              class="rounded-lg px-3 py-2 text-sm font-bold text-slate-300 transition hover:bg-sky-400/10 hover:text-sky-200 focus-visible:bg-sky-400/10 focus-visible:text-sky-200 focus-visible:outline-none"
-              href="#genre/${encodeURIComponent(genre.slug)}"
-              data-genre-slug="${escapeHtml(genre.slug)}"
-            >
-              ${escapeHtml(genre.name)}
-            </a>
-          `,
-        )
-        .join("");
+    layer.classList.toggle("is-open", isOpen);
+    layer.setAttribute("aria-hidden", String(!isOpen));
+    toggle.setAttribute("aria-expanded", String(isOpen));
+    document.body.classList.toggle("overflow-hidden", isOpen);
+
+    if (isOpen) {
+      window.setTimeout(() => document.querySelector("#mobileNavClose")?.focus(), 120);
+    } else if (returnFocus) {
+      toggle.focus();
+    }
+  }
+
+  function setDesktopMenuOpen(menuName, isOpen) {
+    if (isOpen) {
+      ["Genre", "Year"].forEach((name) => {
+        if (name !== menuName) {
+          setDesktopMenuOpen(name, false);
+        }
+      });
+    }
+
+    const menu = document.querySelector(`#desktop${menuName}Menu`);
+    const toggle = document.querySelector(`#desktop${menuName}Toggle`);
+    const dropdown = document.querySelector(`#desktop${menuName}Dropdown`);
+
+    menu?.classList.toggle("is-open", isOpen);
+    toggle?.setAttribute("aria-expanded", String(isOpen));
+    dropdown?.setAttribute("aria-hidden", String(!isOpen));
+  }
+
+  function setMobileFilterOpen(filterName, isOpen) {
+    if (isOpen) {
+      ["Genre", "Year"].forEach((name) => {
+        if (name !== filterName) {
+          setMobileFilterOpen(name, false);
+        }
+      });
+    }
+
+    const list = document.querySelector(`#mobile${filterName}List`);
+    const toggle = document.querySelector(`#mobile${filterName}Toggle`);
+
+    list?.classList.toggle("is-open", isOpen);
+    list?.setAttribute("aria-hidden", String(!isOpen));
+    toggle?.setAttribute("aria-expanded", String(isOpen));
+  }
+
+  function hideDropdown() {
+    document.querySelector("#searchDropdown")?.classList.add("hidden");
+    document.querySelector("#globalSearch")?.setAttribute("aria-expanded", "false");
+  }
+
+  function setSearchOpen(isOpen, returnFocus = false) {
+    const search = document.querySelector("#headerSearch");
+    const panel = document.querySelector("#searchPanel");
+    const toggle = document.querySelector("#searchToggle");
+
+    search?.classList.toggle("is-open", isOpen);
+    panel?.setAttribute("aria-hidden", String(!isOpen));
+    toggle?.setAttribute("aria-expanded", String(isOpen));
+
+    if (isOpen) {
+      window.setTimeout(() => document.querySelector("#globalSearch")?.focus(), 100);
+    } else {
+      activeSearchRequest += 1;
+      window.clearTimeout(debounceTimer);
+      hideDropdown();
+
+      if (returnFocus) {
+        toggle?.focus();
+      }
+    }
+  }
+
+  window.updateHeaderRoute = function updateHeaderRoute(routeName, params = {}) {
+    let activeRoute = routeName;
+
+    if (routeName === "watch") {
+      activeRoute = params.mediaType === "tv" ? "series" : "movies";
+    }
+
+    document.querySelectorAll("[data-nav-route]").forEach((link) => {
+      const isActive = link.getAttribute("data-nav-route") === activeRoute;
+      link.classList.toggle("is-active", isActive);
+
+      if (isActive) {
+        link.setAttribute("aria-current", "page");
+      } else {
+        link.removeAttribute("aria-current");
+      }
+    });
+
+    document.querySelectorAll("[data-genre-slug]").forEach((link) => {
+      const isActive =
+        routeName === "genre" &&
+        link.getAttribute("data-genre-slug") === params.genre;
+      link.classList.toggle("is-active", isActive);
+
+      if (isActive) {
+        link.setAttribute("aria-current", "page");
+      } else {
+        link.removeAttribute("aria-current");
+      }
+    });
+
+    document.querySelectorAll("[data-year]").forEach((link) => {
+      const isActive =
+        routeName === "year" && link.getAttribute("data-year") === params.year;
+      link.classList.toggle("is-active", isActive);
+
+      if (isActive) {
+        link.setAttribute("aria-current", "page");
+      } else {
+        link.removeAttribute("aria-current");
+      }
+    });
+
+    setMobileFilterOpen("Genre", routeName === "genre");
+    setMobileFilterOpen("Year", routeName === "year");
+  };
+
+  function searchGhostRows() {
+    return Array.from(
+      { length: 3 },
+      () => `
+        <div class="flex gap-3 border-b border-blue-950/70 p-3 last:border-b-0">
+          <div class="h-16 w-11 shrink-0 animate-pulse bg-blue-950/70"></div>
+          <div class="min-w-0 flex-1 pt-1">
+            <div class="h-4 w-3/4 animate-pulse bg-blue-950/70"></div>
+            <div class="mt-3 h-3 w-1/2 animate-pulse bg-blue-950/50"></div>
+          </div>
+        </div>
+      `,
+    ).join("");
+  }
+
+  function renderFilterMenus() {
+    const genres = window.RainFlixApi?.GENRES || [];
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: currentYear - 1949 }, (_, index) => currentYear - index);
+    const genreMarkup = genres
+      .map(
+        (genre) => `
+          <a
+            class="filter-menu-link"
+            href="#genre/${encodeURIComponent(genre.slug)}"
+            data-genre-slug="${escapeHtml(genre.slug)}"
+            role="menuitem"
+          >
+            ${escapeHtml(genre.name)}
+          </a>
+        `,
+      )
+      .join("");
+    const yearMarkup = years
+      .map(
+        (year) => `
+          <a
+            class="filter-menu-link text-center"
+            href="#year/${year}"
+            data-year="${year}"
+            role="menuitem"
+          >
+            ${year}
+          </a>
+        `,
+      )
+      .join("");
+
+    const desktopGenreList = document.querySelector("#desktopGenreList");
+    const mobileGenreList = document.querySelector("#mobileGenreList");
+    const desktopYearList = document.querySelector("#desktopYearList");
+    const mobileYearList = document.querySelector("#mobileYearList");
+
+    if (desktopGenreList) {
+      desktopGenreList.innerHTML = genreMarkup;
+    }
+
+    if (mobileGenreList) {
+      mobileGenreList.innerHTML = genreMarkup.replaceAll(' role="menuitem"', "");
+    }
+
+    if (desktopYearList) {
+      desktopYearList.innerHTML = yearMarkup;
+    }
+
+    if (mobileYearList) {
+      mobileYearList.innerHTML = yearMarkup.replaceAll(' role="menuitem"', "");
     }
   }
 
@@ -161,11 +224,6 @@
     dropdown.innerHTML = html;
     dropdown.classList.remove("hidden");
     document.querySelector("#globalSearch")?.setAttribute("aria-expanded", "true");
-  }
-
-  function hideDropdown() {
-    document.querySelector("#searchDropdown")?.classList.add("hidden");
-    document.querySelector("#globalSearch")?.setAttribute("aria-expanded", "false");
   }
 
   async function runSearch(query) {
@@ -187,26 +245,30 @@
       setDropdownContent(
         window.RainFlixApi.hasTmdbCredentials()
           ? '<div class="px-4 py-3 text-sm text-slate-400">No titles found.</div>'
-          : '<div class="px-4 py-3 text-sm text-slate-400">Add TMDb credentials in scripts/config.js to search the full database.</div>',
+          : '<div class="px-4 py-3 text-sm text-slate-400">Search is unavailable without TMDb credentials.</div>',
       );
       return;
     }
 
-    setDropdownContent(
-      `<div class="max-h-[22rem] overflow-y-auto">
+    setDropdownContent(`
+      <div class="max-h-[22rem] overflow-y-auto">
         ${results
           .map((item) => {
             const image = item.poster || item.backdrop || imageFallback(item.title);
-            const url = window.RainFlixApi.buildWatchUrl(item);
 
             return `
-              <a
-                class="flex min-h-[5.5rem] gap-3 border-b border-blue-950/70 p-3 text-left transition last:border-b-0 hover:bg-sky-400/10 focus-visible:bg-sky-400/10 focus-visible:outline-none"
-                href="${url}"
+              <button
+                class="flex min-h-[5.5rem] w-full gap-3 border-b border-blue-950/70 p-3 text-left transition-colors duration-200 last:border-b-0 hover:bg-sky-400/10 focus-visible:bg-sky-400/10 focus-visible:outline-none"
+                type="button"
+                data-search-result
+                data-more-info
+                data-media-type="${escapeHtml(item.mediaType)}"
+                data-media-id="${escapeHtml(item.id)}"
                 role="option"
+                aria-label="More information about ${escapeHtml(item.title)}"
               >
                 <img
-                  class="h-16 w-11 shrink-0 rounded object-cover"
+                  class="h-16 w-11 shrink-0 object-cover"
                   src="${image}"
                   alt=""
                   loading="lazy"
@@ -216,25 +278,60 @@
                   <span class="block truncate text-sm font-bold text-slate-100">${escapeHtml(item.title)}</span>
                   <span class="mt-1 block text-xs text-slate-400">${window.RainFlixApi.mediaLabel(item.mediaType)} &middot; ${escapeHtml(item.year)} &middot; ${escapeHtml(item.rating)}</span>
                 </span>
-              </a>
+              </button>
             `;
           })
           .join("")}
-      </div>${
-        window.RainFlixApi.hasTmdbCredentials()
-          ? ""
-          : '<div class="border-t border-blue-950/70 px-4 py-3 text-xs text-slate-500">Full TMDb search activates after adding credentials in scripts/config.js.</div>'
-      }`,
-    );
+      </div>
+    `);
+  }
+
+  function attachDesktopMenu(menuName) {
+    const menu = document.querySelector(`#desktop${menuName}Menu`);
+    const toggle = document.querySelector(`#desktop${menuName}Toggle`);
+    const list = document.querySelector(`#desktop${menuName}List`);
+
+    menu?.addEventListener("pointerenter", () => {
+      setDesktopMenuOpen(menuName, true);
+    });
+    menu?.addEventListener("pointerleave", () => {
+      if (!menu.contains(document.activeElement)) {
+        setDesktopMenuOpen(menuName, false);
+      }
+    });
+    menu?.addEventListener("focusin", () => {
+      window.clearTimeout(menuFocusTimers.get(menuName));
+      setDesktopMenuOpen(menuName, true);
+    });
+    menu?.addEventListener("focusout", () => {
+      window.clearTimeout(menuFocusTimers.get(menuName));
+      menuFocusTimers.set(
+        menuName,
+        window.setTimeout(() => {
+          if (!menu.contains(document.activeElement)) {
+            setDesktopMenuOpen(menuName, false);
+          }
+        }, 80),
+      );
+    });
+    toggle?.addEventListener("click", () => {
+      const isOpen = toggle.getAttribute("aria-expanded") === "true";
+      setDesktopMenuOpen(menuName, !isOpen);
+    });
+    list?.addEventListener("click", () => setDesktopMenuOpen(menuName, false));
   }
 
   window.initHeader = function initHeader() {
-    renderGenreMenus();
+    renderFilterMenus();
 
+    const headerShell = document.querySelector("#site-header");
+    const search = document.querySelector("#headerSearch");
     const searchInput = document.querySelector("#globalSearch");
-    const desktopGenreMenu = document.querySelector("#desktopGenreMenu");
-    const desktopGenreToggle = document.querySelector("#desktopGenreToggle");
+    const searchToggle = document.querySelector("#searchToggle");
+    const searchClose = document.querySelector("#searchClose");
+    const searchDropdown = document.querySelector("#searchDropdown");
     const mobileGenreToggle = document.querySelector("#mobileGenreToggle");
+    const mobileYearToggle = document.querySelector("#mobileYearToggle");
     const mobileNavLayer = document.querySelector("#mobileNavLayer");
     const mobileNavToggle = document.querySelector("#mobileNavToggle");
     const mobileNavClose = document.querySelector("#mobileNavClose");
@@ -244,31 +341,19 @@
       document.body.appendChild(mobileNavLayer);
     }
 
-    if (searchHandler && searchInput) {
-      searchInput.removeEventListener("input", searchHandler);
-    }
+    const syncHeaderSurface = () => {
+      headerShell?.classList.toggle("is-scrolled", window.scrollY > 24);
+    };
 
-    if (blurHandler) {
-      document.removeEventListener("click", blurHandler);
-    }
+    syncHeaderSurface();
+    window.addEventListener("scroll", syncHeaderSurface, { passive: true });
 
-    if (resultClickHandler) {
-      document
-        .querySelector("#searchDropdown")
-        ?.removeEventListener("click", resultClickHandler);
-    }
+    searchToggle?.addEventListener("click", () => {
+      setSearchOpen(searchToggle.getAttribute("aria-expanded") !== "true");
+    });
+    searchClose?.addEventListener("click", () => setSearchOpen(false, true));
 
-    if (resultKeyHandler) {
-      document
-        .querySelector("#searchDropdown")
-        ?.removeEventListener("keydown", resultKeyHandler);
-    }
-
-    if (searchKeyHandler && searchInput) {
-      searchInput.removeEventListener("keydown", searchKeyHandler);
-    }
-
-    searchHandler = (event) => {
+    searchInput?.addEventListener("input", (event) => {
       window.clearTimeout(debounceTimer);
       activeSearchRequest += 1;
 
@@ -277,20 +362,15 @@
         return;
       }
 
-      setDropdownContent(
-        searchGhostRows(),
-      );
-
+      setDropdownContent(searchGhostRows());
       debounceTimer = window.setTimeout(() => {
         runSearch(event.target.value).catch(() => {
           setDropdownContent(
             '<div class="px-4 py-3 text-sm text-slate-400">Search is unavailable right now.</div>',
           );
         });
-      }, 360);
-    };
-
-    searchInput?.addEventListener("input", searchHandler);
+      }, 300);
+    });
 
     searchInput?.addEventListener("focus", () => {
       if (searchInput.value.trim().length >= 2) {
@@ -298,53 +378,41 @@
       }
     });
 
-    searchKeyHandler = (event) => {
+    searchInput?.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
-        hideDropdown();
+        event.preventDefault();
+        setSearchOpen(false, true);
         return;
       }
 
       if (event.key === "ArrowDown") {
-        const firstResult = document.querySelector("#searchDropdown a");
+        const firstResult = document.querySelector("#searchDropdown [data-search-result]");
 
         if (firstResult) {
           event.preventDefault();
           firstResult.focus();
         }
       }
-    };
+    });
 
-    searchInput?.addEventListener("keydown", searchKeyHandler);
-
-    blurHandler = (event) => {
-      if (!event.target.closest("#searchDropdown") && event.target !== searchInput) {
-        hideDropdown();
-      }
-
-      if (!event.target.closest("#desktopGenreMenu")) {
-        setDesktopGenreOpen(false);
-      }
-    };
-
-    document.addEventListener("click", blurHandler);
-
-    resultClickHandler = (event) => {
-      if (event.target.closest("a")) {
-        hideDropdown();
+    searchDropdown?.addEventListener("click", (event) => {
+      if (event.target.closest("[data-search-result]")) {
         if (searchInput) {
           searchInput.value = "";
         }
+        setSearchOpen(false);
       }
-    };
+    });
 
-    resultKeyHandler = (event) => {
-      const results = [...document.querySelectorAll("#searchDropdown a")];
+    searchDropdown?.addEventListener("keydown", (event) => {
+      const results = [
+        ...document.querySelectorAll("#searchDropdown [data-search-result]"),
+      ];
       const currentIndex = results.indexOf(document.activeElement);
 
       if (event.key === "Escape") {
         event.preventDefault();
-        hideDropdown();
-        searchInput?.focus();
+        setSearchOpen(false, true);
         return;
       }
 
@@ -353,89 +421,84 @@
       }
 
       event.preventDefault();
-      const direction = event.key === "ArrowDown" ? 1 : -1;
-      const nextIndex = Math.min(
-        results.length - 1,
-        Math.max(0, currentIndex + direction),
-      );
 
       if (event.key === "ArrowUp" && currentIndex === 0) {
         searchInput?.focus();
         return;
       }
 
+      const direction = event.key === "ArrowDown" ? 1 : -1;
+      const nextIndex = Math.min(
+        results.length - 1,
+        Math.max(0, currentIndex + direction),
+      );
       results[nextIndex]?.focus();
-    };
+    });
 
-    document
-      .querySelector("#searchDropdown")
-      ?.addEventListener("click", resultClickHandler);
-    document
-      .querySelector("#searchDropdown")
-      ?.addEventListener("keydown", resultKeyHandler);
-
-    desktopGenreMenu?.addEventListener("pointerenter", () => {
-      setDesktopGenreOpen(true);
-    });
-    desktopGenreMenu?.addEventListener("pointerleave", () => {
-      if (!desktopGenreMenu.contains(document.activeElement)) {
-        setDesktopGenreOpen(false);
-      }
-    });
-    desktopGenreMenu?.addEventListener("focusin", () => {
-      window.clearTimeout(genreFocusTimer);
-      setDesktopGenreOpen(true);
-    });
-    desktopGenreMenu?.addEventListener("focusout", () => {
-      window.clearTimeout(genreFocusTimer);
-      genreFocusTimer = window.setTimeout(() => {
-        if (!desktopGenreMenu.contains(document.activeElement)) {
-          setDesktopGenreOpen(false);
-        }
-      });
-    });
-    desktopGenreToggle?.addEventListener("click", () => {
-      setDesktopGenreOpen(true);
-    });
-    document
-      .querySelector("#desktopGenreList")
-      ?.addEventListener("click", () => setDesktopGenreOpen(false));
+    attachDesktopMenu("Genre");
+    attachDesktopMenu("Year");
 
     mobileNavToggle?.addEventListener("click", () => setMobileNavOpen(true));
+    mobileNavClose?.addEventListener("click", () => setMobileNavOpen(false, true));
+    mobileNavBackdrop?.addEventListener("click", () => setMobileNavOpen(false, true));
     mobileGenreToggle?.addEventListener("click", () => {
-      setMobileGenreOpen(
+      setMobileFilterOpen(
+        "Genre",
         mobileGenreToggle.getAttribute("aria-expanded") !== "true",
       );
     });
-    mobileNavClose?.addEventListener("click", () => setMobileNavOpen(false, true));
-    mobileNavBackdrop?.addEventListener("click", () => setMobileNavOpen(false, true));
-    document.querySelector("#mobileNavLayer")?.addEventListener("click", (event) => {
+    mobileYearToggle?.addEventListener("click", () => {
+      setMobileFilterOpen(
+        "Year",
+        mobileYearToggle.getAttribute("aria-expanded") !== "true",
+      );
+    });
+    mobileNavLayer?.addEventListener("click", (event) => {
       if (event.target.closest("a")) {
         setMobileNavOpen(false);
       }
     });
 
-    mobileNavKeyHandler = (event) => {
-      if (
-        event.key === "Escape" &&
-        document.querySelector("#desktopGenreToggle")?.getAttribute(
-          "aria-expanded",
-        ) === "true"
-      ) {
-        setDesktopGenreOpen(false);
-        desktopGenreToggle?.blur();
+    document.addEventListener("click", (event) => {
+      if (!event.target.closest("#headerSearch") && search?.classList.contains("is-open")) {
+        setSearchOpen(false);
+      }
+
+      if (!event.target.closest("#desktopGenreMenu")) {
+        setDesktopMenuOpen("Genre", false);
+      }
+
+      if (!event.target.closest("#desktopYearMenu")) {
+        setDesktopMenuOpen("Year", false);
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") {
         return;
       }
 
-      if (
-        event.key === "Escape" &&
-        document.querySelector("#mobileNavToggle")?.getAttribute("aria-expanded") ===
-          "true"
-      ) {
+      if (search?.classList.contains("is-open")) {
+        setSearchOpen(false, true);
+        return;
+      }
+
+      const openMenu = ["Genre", "Year"].find(
+        (name) =>
+          document.querySelector(`#desktop${name}Toggle`)?.getAttribute(
+            "aria-expanded",
+          ) === "true",
+      );
+
+      if (openMenu) {
+        setDesktopMenuOpen(openMenu, false);
+        document.querySelector(`#desktop${openMenu}Toggle`)?.focus();
+        return;
+      }
+
+      if (mobileNavToggle?.getAttribute("aria-expanded") === "true") {
         setMobileNavOpen(false, true);
       }
-    };
-
-    document.addEventListener("keydown", mobileNavKeyHandler);
+    });
   };
 })();

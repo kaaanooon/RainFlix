@@ -529,10 +529,50 @@
     return logos[0]?.file_path ? imageUrl(logos[0].file_path, "w500") : "";
   }
 
+  function preferredTrailer(videos) {
+    const trailers = (videos?.results || [])
+      .filter(
+        (video) =>
+          video.site === "YouTube" &&
+          video.key &&
+          (video.type === "Trailer" || video.type === "Teaser"),
+      )
+      .sort((left, right) => {
+        const officialDifference = Number(right.official) - Number(left.official);
+
+        if (officialDifference) {
+          return officialDifference;
+        }
+
+        const typeDifference =
+          Number(right.type === "Trailer") - Number(left.type === "Trailer");
+
+        if (typeDifference) {
+          return typeDifference;
+        }
+
+        const languageDifference =
+          Number(right.iso_639_1 === "en") - Number(left.iso_639_1 === "en");
+
+        if (languageDifference) {
+          return languageDifference;
+        }
+
+        return String(right.published_at || "").localeCompare(
+          String(left.published_at || ""),
+        );
+      });
+
+    return trailers[0]?.key || "";
+  }
+
   function mapTmdbDetails(item, mediaType) {
     const normalizedType = normalizeMediaType(mediaType);
     const releaseDate =
       normalizedType === "tv" ? item.first_air_date : item.release_date;
+    const episodeRuntime = (item.episode_run_time || []).find(
+      (runtime) => Number(runtime) > 0,
+    );
 
     return {
       id: item.id,
@@ -544,6 +584,25 @@
       backdrop: imageUrl(item.backdrop_path, "w1280") || imageUrl(item.poster_path, "w780"),
       logo: preferredLogo(item.images),
       synopsis: item.overview || "No synopsis available yet.",
+      tagline: item.tagline || "",
+      releaseDate: releaseDate || "",
+      status: item.status || "",
+      genres: (item.genres || []).map((genre) => genre.name).filter(Boolean),
+      cast: (item.credits?.cast || []).slice(0, 10).map((person) => ({
+        id: person.id,
+        name: person.name || "Unknown cast member",
+        character: person.character || "",
+        image: imageUrl(person.profile_path, "w185"),
+      })),
+      trailerKey: preferredTrailer(item.videos),
+      duration:
+        normalizedType === "tv"
+          ? episodeRuntime
+            ? `${episodeRuntime} min episodes`
+            : ""
+          : item.runtime
+            ? `${item.runtime} min`
+            : "",
       runtime:
         normalizedType === "tv"
           ? `${item.number_of_seasons || 1} season${item.number_of_seasons === 1 ? "" : "s"}`
@@ -606,6 +665,13 @@
 
     return {
       ...item,
+      cast: [],
+      duration: "",
+      genres: [],
+      releaseDate: item.year || "",
+      status: item.mediaType === "tv" ? "Returning Series" : "Released",
+      tagline: "",
+      trailerKey: "",
       runtime: item.mediaType === "tv" ? `${seasonCount} season${seasonCount === 1 ? "" : "s"}` : "",
       seasons:
         item.mediaType === "tv"
@@ -811,6 +877,129 @@
     }
   }
 
+  async function getYearTitles({
+    year,
+    filter = "all",
+    page = 1,
+    limit = PAGE_SIZE,
+    sortBy = "popularity",
+  } = {}) {
+    const currentYear = new Date().getFullYear();
+    const selectedYear = Math.min(
+      currentYear,
+      Math.max(1900, Number.parseInt(year, 10) || currentYear),
+    );
+    const normalizedFilter = filter === "series" ? "tv" : filter;
+    const mediaTypes =
+      normalizedFilter === "movie" || normalizedFilter === "tv"
+        ? [normalizedFilter]
+        : ["movie", "tv"];
+    const startDate = `${selectedYear}-01-01`;
+    const yearEnd = `${selectedYear}-12-31`;
+    const endDate = selectedYear === currentYear ? today() : yearEnd;
+
+    try {
+      const responses = await Promise.all(
+        mediaTypes.map(async (mediaType) => {
+          const newest = sortBy === "newest";
+          const params = {
+            include_adult: "false",
+            page,
+            sort_by: newest
+              ? mediaType === "movie"
+                ? "primary_release_date.desc"
+                : "first_air_date.desc"
+              : "popularity.desc",
+            "vote_count.gte": 5,
+          };
+
+          if (mediaType === "movie") {
+            params.include_video = "false";
+            params["primary_release_date.gte"] = startDate;
+            params["primary_release_date.lte"] = endDate;
+            params.region = config().tmdbRegion || "US";
+          } else {
+            params.include_null_first_air_dates = "false";
+            params["first_air_date.gte"] = startDate;
+            params["first_air_date.lte"] = endDate;
+          }
+
+          return {
+            data: await tmdbFetch(`discover/${mediaType}`, params),
+            mediaType,
+          };
+        }),
+      );
+
+      if (responses.every(({ data }) => !data)) {
+        const items = fallbackItems(normalizedFilter).filter(
+          (item) => item.year === String(selectedYear),
+        );
+        const start = (page - 1) * limit;
+
+        return {
+          items: items.slice(start, start + limit),
+          page,
+          totalPages: Math.max(1, Math.ceil(items.length / limit)),
+          source: "demo",
+        };
+      }
+
+      const compareItems = (left, right) => {
+        if (sortBy === "newest") {
+          const leftDate = left.release_date || left.first_air_date || "";
+          const rightDate = right.release_date || right.first_air_date || "";
+          return rightDate.localeCompare(leftDate);
+        }
+
+        return (right.popularity || 0) - (left.popularity || 0);
+      };
+      const queues = responses.map(({ data, mediaType }) =>
+        (data?.results || [])
+          .map((item) => ({ ...item, media_type: mediaType }))
+          .filter((item) => item.poster_path || item.backdrop_path)
+          .sort(compareItems),
+      );
+      const selectedItems = [];
+
+      while (
+        selectedItems.length < limit &&
+        queues.some((queue) => queue.length)
+      ) {
+        queues.forEach((queue) => {
+          if (selectedItems.length < limit && queue.length) {
+            selectedItems.push(queue.shift());
+          }
+        });
+      }
+
+      return {
+        items: selectedItems
+          .map((item) => mapTmdbTitle(item, item.media_type))
+          .slice(0, limit),
+        page,
+        totalPages: Math.min(
+          Math.max(...responses.map(({ data }) => data?.total_pages || 1)),
+          500,
+        ),
+        source: "tmdb",
+      };
+    } catch (error) {
+      console.warn(error);
+      const items = fallbackItems(normalizedFilter).filter(
+        (item) => item.year === String(selectedYear),
+      );
+      const start = (page - 1) * limit;
+
+      return {
+        items: items.slice(start, start + limit),
+        page,
+        totalPages: Math.max(1, Math.ceil(items.length / limit)),
+        source: "demo",
+      };
+    }
+  }
+
   async function getTrendingThisWeek(limit = PAGE_SIZE) {
     try {
       const data = await tmdbFetch("trending/all/week", { page: 1 });
@@ -952,7 +1141,7 @@
 
     try {
       const data = await tmdbFetch(`${normalizedType}/${id}`, {
-        append_to_response: "external_ids,images",
+        append_to_response: "external_ids,images,credits,videos",
         include_image_language: "en,null",
       });
 
@@ -1370,6 +1559,7 @@
     getTrending,
     getTrendingThisWeek,
     getTrendingMovies,
+    getYearTitles,
     hasTmdbCredentials,
     mediaLabel,
     normalizeMediaType,

@@ -1,4 +1,4 @@
-<header class="border-b border-blue-950/70 bg-slate-950/90 shadow-xl shadow-black/25 backdrop-blur-xl">
+<header class="relative bg-transparent">
   <div class="mx-auto flex h-[4.5rem] w-full max-w-[1536px] items-center gap-2 px-4 md:gap-6 md:px-10 lg:px-12">
     <a
       class="inline-flex min-w-max items-center text-slate-50 no-underline"
@@ -8,14 +8,15 @@
       <img class="h-7 w-auto object-contain md:h-8" src="./assets/rainflix-wordmark.png" alt="RainFlix" draggable="false" />
     </a>
 
-    <nav class="relative hidden items-center gap-1 md:flex" aria-label="Primary navigation">
-      <a class="rounded-lg px-3 py-2 text-sm font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#home" data-nav-route="home">Home</a>
-      <a class="rounded-lg px-3 py-2 text-sm font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#movies" data-nav-route="movies">Movies</a>
-      <a class="rounded-lg px-3 py-2 text-sm font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#series" data-nav-route="series">Series</a>
-      <div id="desktopGenreMenu" class="genre-menu">
+    <nav class="relative hidden h-full items-center gap-5 md:flex" aria-label="Primary navigation">
+      <a class="header-nav-link" href="#home" data-nav-route="home">Home</a>
+      <a class="header-nav-link" href="#movies" data-nav-route="movies">Movies</a>
+      <a class="header-nav-link" href="#series" data-nav-route="series">Series</a>
+
+      <div id="desktopGenreMenu" class="header-menu flex h-full items-center">
         <button
           id="desktopGenreToggle"
-          class="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+          class="header-nav-link h-full"
           type="button"
           data-nav-route="genre"
           aria-haspopup="menu"
@@ -23,97 +24,159 @@
           aria-expanded="false"
         >
           Genres
-          <span class="text-xs" aria-hidden="true">&#9662;</span>
         </button>
         <div
           id="desktopGenreDropdown"
-          class="genre-dropdown absolute left-0 top-full z-[220] w-[min(34rem,calc(100vw-3rem))] pt-2"
+          class="header-dropdown absolute left-0 top-full z-[220] w-[min(34rem,calc(100vw-3rem))] pt-2"
           aria-hidden="true"
         >
           <div
             id="desktopGenreList"
-            class="grid max-h-[28rem] grid-cols-3 gap-1 overflow-y-auto rounded-lg border border-blue-900/80 bg-slate-950/95 p-3 shadow-2xl shadow-black/45 backdrop-blur-xl"
+            class="grid max-h-[28rem] grid-cols-3 gap-x-4 gap-y-1 overflow-y-auto border border-blue-900/80 bg-slate-950/95 p-4 shadow-2xl shadow-black/45 backdrop-blur-xl"
             role="menu"
             aria-label="Browse genres"
           ></div>
         </div>
       </div>
+
+      <div id="desktopYearMenu" class="header-menu flex h-full items-center">
+        <button
+          id="desktopYearToggle"
+          class="header-nav-link h-full"
+          type="button"
+          data-nav-route="year"
+          aria-haspopup="menu"
+          aria-controls="desktopYearDropdown"
+          aria-expanded="false"
+        >
+          Year
+        </button>
+        <div
+          id="desktopYearDropdown"
+          class="header-dropdown absolute left-0 top-full z-[220] w-[min(32rem,calc(100vw-3rem))] pt-2"
+          aria-hidden="true"
+        >
+          <div
+            id="desktopYearList"
+            class="grid max-h-[25rem] grid-cols-5 gap-x-3 gap-y-1 overflow-y-auto border border-blue-900/80 bg-slate-950/95 p-4 shadow-2xl shadow-black/45 backdrop-blur-xl"
+            role="menu"
+            aria-label="Browse by release year"
+          ></div>
+        </div>
+      </div>
     </nav>
 
-    <div class="relative ml-auto min-w-0 flex-1 md:max-w-md">
-      <label
-        class="flex h-10 w-full items-center gap-3 rounded-lg border border-blue-900/70 bg-blue-950/35 px-3 text-slate-400 transition focus-within:border-sky-400 focus-within:ring-4 focus-within:ring-sky-400/10 md:h-11 md:px-4"
-        for="globalSearch"
+    <div id="headerSearch" class="header-search relative ml-auto shrink-0">
+      <button
+        id="searchToggle"
+        class="header-icon-button"
+        type="button"
+        aria-label="Search titles"
+        aria-controls="searchPanel"
+        aria-expanded="false"
+        title="Search"
       >
-        <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="m21 21-4.2-4.2m2.2-5.3a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2" />
+          <path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
         </svg>
-        <input
-          id="globalSearch"
-          class="w-full min-w-0 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
-          type="search"
-          placeholder="Search titles"
-          autocomplete="off"
-          aria-autocomplete="list"
-          aria-controls="searchDropdown"
-          aria-expanded="false"
-        />
-      </label>
+      </button>
 
-      <div
-        id="searchDropdown"
-        class="absolute -right-12 top-[calc(100%+0.5rem)] z-[210] hidden w-[min(30rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-blue-900/80 bg-slate-950/95 shadow-2xl shadow-black/45 backdrop-blur-xl md:right-0"
-        role="listbox"
-        aria-label="Search results"
-      ></div>
+      <div id="searchPanel" class="header-search-panel absolute z-[230]" aria-hidden="true">
+        <label
+          class="flex h-12 w-full items-center gap-3 border border-blue-900/80 bg-slate-950 px-4 text-slate-400 shadow-2xl shadow-black/40 backdrop-blur-xl transition focus-within:border-sky-400 focus-within:ring-4 focus-within:ring-sky-400/10"
+          for="globalSearch"
+        >
+          <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2" />
+            <path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+          <input
+            id="globalSearch"
+            class="w-full min-w-0 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
+            type="search"
+            placeholder="Search movies and series"
+            autocomplete="off"
+            aria-autocomplete="list"
+            aria-controls="searchDropdown"
+            aria-expanded="false"
+          />
+          <button id="searchClose" class="shrink-0 text-slate-400 transition hover:text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" type="button" aria-label="Close search" title="Close search">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </button>
+        </label>
+
+        <div
+          id="searchDropdown"
+          class="absolute right-0 top-full mt-2 hidden w-full overflow-hidden border border-blue-900/80 bg-slate-950/95 shadow-2xl shadow-black/45 backdrop-blur-xl"
+          role="listbox"
+          aria-label="Search results"
+        ></div>
+      </div>
     </div>
 
     <button
       id="mobileNavToggle"
-      class="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-blue-900/70 bg-blue-950/35 text-xl text-slate-100 transition hover:border-sky-500/70 hover:text-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 md:hidden"
+      class="header-icon-button md:hidden"
       type="button"
       aria-label="Open navigation"
       aria-controls="mobileNavLayer"
       aria-expanded="false"
       title="Menu"
     >
-      <span aria-hidden="true">&#9776;</span>
+      <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+      </svg>
     </button>
   </div>
 
-  <div id="mobileNavLayer" class="hidden md:hidden" aria-hidden="true">
-    <button id="mobileNavBackdrop" class="fixed inset-0 z-[300] cursor-default bg-black/80" type="button" aria-label="Close navigation"></button>
-    <aside class="fixed inset-y-0 left-0 z-[310] w-[min(18rem,82vw)] overflow-y-auto border-r border-blue-900/70 bg-slate-950 p-5 shadow-2xl shadow-black/60" aria-label="Mobile navigation">
+  <div id="mobileNavLayer" class="mobile-nav-layer md:hidden" aria-hidden="true">
+    <button id="mobileNavBackdrop" class="mobile-nav-backdrop fixed inset-0 z-[300] cursor-default bg-black/80" type="button" aria-label="Close navigation"></button>
+    <aside class="mobile-nav-drawer fixed inset-y-0 left-0 z-[310] w-[min(18rem,82vw)] overflow-y-auto border-r border-blue-900/70 bg-slate-950 p-5 shadow-2xl shadow-black/60" aria-label="Mobile navigation">
       <div class="flex items-center justify-between border-b border-blue-950/80 pb-5">
         <a class="inline-flex items-center text-slate-50" href="#home" aria-label="RainFlix home">
           <img class="h-8 w-auto object-contain" src="./assets/rainflix-wordmark.png" alt="RainFlix" draggable="false" />
         </a>
-        <button id="mobileNavClose" class="grid h-10 w-10 place-items-center text-3xl leading-none text-slate-400 transition hover:text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" type="button" aria-label="Close navigation" title="Close">
-          <span aria-hidden="true">&times;</span>
+        <button id="mobileNavClose" class="header-icon-button" type="button" aria-label="Close navigation" title="Close">
+          <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
         </button>
       </div>
 
-      <nav class="mt-5 grid gap-2" aria-label="Mobile primary navigation">
-        <a class="rounded-lg px-4 py-3 text-base font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#home" data-nav-route="home">Home</a>
-        <a class="rounded-lg px-4 py-3 text-base font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#movies" data-nav-route="movies">Movies</a>
-        <a class="rounded-lg px-4 py-3 text-base font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#series" data-nav-route="series">Series</a>
-        <div class="mt-2 border-t border-blue-950/80 pt-2">
+      <nav class="mt-5 grid gap-1" aria-label="Mobile primary navigation">
+        <a class="mobile-nav-link" href="#home" data-nav-route="home">Home</a>
+        <a class="mobile-nav-link" href="#movies" data-nav-route="movies">Movies</a>
+        <a class="mobile-nav-link" href="#series" data-nav-route="series">Series</a>
+
+        <div class="border-t border-blue-950/80 pt-1">
           <button
             id="mobileGenreToggle"
-            class="flex w-full items-center justify-between rounded-lg px-4 py-3 text-left text-base font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+            class="mobile-nav-link w-full text-left"
             type="button"
             data-nav-route="genre"
             aria-controls="mobileGenreList"
             aria-expanded="false"
           >
             Genres
-            <span class="text-xs transition" data-mobile-genre-arrow aria-hidden="true">&#9662;</span>
           </button>
-          <div
-            id="mobileGenreList"
-            class="mt-1 hidden grid grid-cols-2 gap-1 pb-2"
-            aria-hidden="true"
-          ></div>
+          <div id="mobileGenreList" class="mobile-filter-list grid grid-cols-2 gap-x-3" aria-hidden="true"></div>
+        </div>
+
+        <div class="border-t border-blue-950/80 pt-1">
+          <button
+            id="mobileYearToggle"
+            class="mobile-nav-link w-full text-left"
+            type="button"
+            data-nav-route="year"
+            aria-controls="mobileYearList"
+            aria-expanded="false"
+          >
+            Year
+          </button>
+          <div id="mobileYearList" class="mobile-filter-list grid grid-cols-3 gap-x-3" aria-hidden="true"></div>
         </div>
       </nav>
     </aside>

@@ -17,6 +17,8 @@
     <link rel="stylesheet" href="./styles/rainflix.css" />
     <script defer src="./scripts/config.js"></script>
     <script defer src="./scripts/rainflix-api.js"></script>
+    <script defer src="./components/details-modal.js"></script>
+    <script defer src="./scripts/remote-navigation.js"></script>
     <script defer src="./scripts/app.js"></script>
   </head>
 
@@ -44,6 +46,29 @@
       <div id="site-header" class="sticky top-0 z-[200]" data-component="header"></div>
       <main id="app-view" class="flex-1 outline-none" tabindex="-1"></main>
       <div id="site-footer" data-component="footer"></div>
+    </div>
+
+    <div id="titleDetailsModal" class="title-details-modal" aria-hidden="true">
+      <button class="title-details-backdrop" type="button" data-details-close aria-label="Close title details"></button>
+      <section
+        class="title-details-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="titleDetailsHeading"
+      >
+        <button
+          class="title-details-close"
+          type="button"
+          data-details-close
+          aria-label="Close title details"
+          title="Close"
+        >
+          <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <div id="titleDetailsContent"></div>
+      </section>
     </div>
   </body>
 </html>

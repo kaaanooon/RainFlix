@@ -110,7 +110,7 @@
           <h1 class="max-w-3xl text-5xl font-black leading-none text-slate-50 lg:text-6xl">
             ${
               details.logo
-                ? `<img class="title-logo max-h-24 w-auto max-w-[min(30rem,78vw)] object-contain object-left lg:max-h-32" src="${details.logo}" alt="${escapeHtml(details.title)}" decoding="async" onerror="this.classList.add('hidden');this.nextElementSibling.classList.remove('hidden');" /><span class="hidden">${escapeHtml(details.title)}</span>`
+                ? `<img class="title-logo max-h-24 w-auto max-w-[min(30rem,78vw)] object-contain object-left lg:max-h-32" src="${details.logo}" alt="${escapeHtml(details.title)}" decoding="async" onload="this.nextElementSibling.classList.add('hidden');" onerror="this.classList.add('hidden');" /><span>${escapeHtml(details.title)}</span>`
                 : escapeHtml(details.title)
             }
           </h1>
@@ -119,13 +119,24 @@
             ${escapeHtml(details.synopsis)}
           </p>
 
-          <button
-            class="mt-5 w-fit rounded-lg bg-sky-400 px-6 py-3 text-sm font-black text-slate-950 shadow-xl shadow-sky-500/20 transition hover:bg-sky-300 focus-visible:bg-sky-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-400/25"
-            type="button"
-            data-scroll-player
-          >
-            ${escapeHtml(startText)}
-          </button>
+          <div class="mt-5 flex flex-wrap gap-3">
+            <button
+              class="rounded-lg bg-sky-400 px-6 py-3 text-sm font-black text-slate-950 shadow-xl shadow-sky-500/20 transition duration-200 hover:bg-sky-300 focus-visible:bg-sky-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-400/25"
+              type="button"
+              data-scroll-player
+            >
+              ${escapeHtml(startText)}
+            </button>
+            <button
+              class="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-slate-950/55 px-6 py-3 text-sm font-black text-slate-50 backdrop-blur transition duration-200 hover:border-sky-400/70 hover:text-sky-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-400/20"
+              type="button"
+              data-more-info
+              data-media-type="${escapeHtml(details.mediaType)}"
+              data-media-id="${escapeHtml(details.id)}"
+            >
+              More info
+            </button>
+          </div>
         </div>
       </article>
     `;
@@ -162,6 +173,16 @@
         </div>
       </div>
 
+      <button
+        class="mt-4 inline-flex items-center gap-2 text-sm font-black text-sky-300 transition duration-200 hover:text-sky-200 focus-visible:outline-none focus-visible:underline"
+        type="button"
+        data-more-info
+        data-media-type="${escapeHtml(details.mediaType)}"
+        data-media-id="${escapeHtml(details.id)}"
+      >
+        More info
+      </button>
+
       <div class="mt-5 border-t border-blue-900/70 pt-5">
         <h3 class="text-sm font-black uppercase tracking-wider text-slate-300">Synopsis</h3>
         <p class="mt-3 text-sm leading-6 text-slate-400">${escapeHtml(details.synopsis)}</p>
@@ -183,37 +204,41 @@
 
   function similarCardTemplate(item) {
     const poster = item.poster || item.backdrop || imageFallback(item.title);
-    const watchUrl = api().buildWatchUrl(item);
 
     return `
-      <a
-        class="catalog-card group block overflow-hidden rounded-lg border border-blue-900/70 bg-slate-950 outline-none transition hover:-translate-y-1 hover:border-sky-500/70 focus-visible:-translate-y-1 focus-visible:border-sky-500/70 focus-visible:ring-4 focus-visible:ring-sky-400/20"
-        href="${watchUrl}"
-        aria-label="Watch ${escapeHtml(item.title)}"
-      >
-        <div class="relative isolate aspect-[2/3] overflow-hidden">
-          <img
-            class="h-full w-full object-cover transition duration-300 group-hover:scale-105 group-hover:brightness-[0.58] group-focus-visible:scale-105 group-focus-visible:brightness-[0.58]"
-            src="${poster}"
-            alt="${escapeHtml(item.title)} poster"
-            loading="lazy"
-            decoding="async"
-            onerror="this.onerror=null;this.src='${imageFallback(item.title)}';"
-          />
-          <div class="absolute inset-0 flex translate-y-3 flex-col justify-end gap-3 bg-gradient-to-t from-slate-950 via-slate-950/78 to-transparent p-4 opacity-0 transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">
-            <h3 class="text-xl font-black leading-tight text-slate-50">${escapeHtml(item.title)}</h3>
-            <p class="line-clamp-3 text-xs leading-5 text-slate-300 md:line-clamp-4 md:text-sm md:leading-6">${escapeHtml(item.synopsis)}</p>
+      <article class="catalog-card group relative overflow-hidden rounded-lg border border-blue-900/70 bg-slate-950 transition duration-300 hover:-translate-y-1 hover:border-sky-500/70 focus-within:-translate-y-1 focus-within:border-sky-500/70">
+        <button
+          class="block w-full text-left outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-sky-400/25"
+          type="button"
+          data-more-info
+          data-media-type="${escapeHtml(item.mediaType)}"
+          data-media-id="${escapeHtml(item.id)}"
+          aria-label="More information about ${escapeHtml(item.title)}"
+        >
+          <div class="relative isolate aspect-[2/3] overflow-hidden">
+            <img
+              class="h-full w-full object-cover transition duration-500 group-hover:scale-105 group-hover:brightness-[0.58] group-focus-within:scale-105 group-focus-within:brightness-[0.58]"
+              src="${poster}"
+              alt="${escapeHtml(item.title)} poster"
+              loading="lazy"
+              decoding="async"
+              onerror="this.onerror=null;this.src='${imageFallback(item.title)}';"
+            />
+            <div class="absolute inset-0 flex translate-y-3 flex-col justify-end gap-3 bg-gradient-to-t from-slate-950 via-slate-950/78 to-transparent p-4 opacity-0 transition duration-300 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+              <h3 class="text-xl font-black leading-tight text-slate-50">${escapeHtml(item.title)}</h3>
+              <p class="line-clamp-3 text-xs leading-5 text-slate-300 md:line-clamp-4 md:text-sm md:leading-6">${escapeHtml(item.synopsis)}</p>
+            </div>
           </div>
-        </div>
-        <div class="space-y-2 p-3">
-          <h3 class="truncate text-sm font-black text-slate-50">${escapeHtml(item.title)}</h3>
-          <div class="flex flex-wrap items-center gap-2 text-xs text-slate-300">
-            <span class="rounded-full bg-blue-500/20 px-2 py-1 font-black text-sky-200">${escapeHtml(item.rating)}</span>
-            <span>${escapeHtml(item.year)}</span>
-            <span class="rounded-full bg-sky-400/15 px-2 py-1 font-black uppercase text-sky-300">${api().mediaLabel(item.mediaType)}</span>
+          <div class="space-y-2 p-3">
+            <h3 class="truncate text-sm font-black text-slate-50">${escapeHtml(item.title)}</h3>
+            <div class="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+              <span class="rounded-full bg-blue-500/20 px-2 py-1 font-black text-sky-200">${escapeHtml(item.rating)}</span>
+              <span>${escapeHtml(item.year)}</span>
+              <span class="rounded-full bg-sky-400/15 px-2 py-1 font-black uppercase text-sky-300">${api().mediaLabel(item.mediaType)}</span>
+            </div>
           </div>
-        </div>
-      </a>
+        </button>
+      </article>
     `;
   }
 
@@ -350,32 +375,30 @@
     syncFullscreenButton();
 
     sourceShell.innerHTML = `
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p class="text-xs font-black uppercase tracking-wider text-slate-400">Players</p>
-        <div class="flex flex-wrap gap-2" role="group" aria-label="Streaming source">
+      <div class="flex items-center justify-between gap-4">
+        <label class="text-xs font-black uppercase tracking-wider text-slate-400" for="playerSourceSelect">Player</label>
+        <select
+          id="playerSourceSelect"
+          class="min-w-0 max-w-xs flex-1 rounded-lg border border-blue-900/80 bg-slate-950 px-3 py-2 text-sm font-bold text-slate-100 outline-none transition duration-200 hover:border-sky-500/70 focus:border-sky-400 focus:ring-4 focus:ring-sky-400/10 sm:flex-none sm:w-56"
+          aria-label="Streaming player"
+        >
           ${sources
-            .map((source) => {
-              const isActive = source.id === activeSource.id;
-
-              return `
-                <button
-                  class="rounded-lg border px-3 py-2 text-xs font-black transition ${isActive ? "border-sky-400 bg-sky-400 text-slate-950" : "border-blue-900/70 bg-slate-950/45 text-slate-300 hover:border-sky-500/70 hover:bg-sky-400/10 hover:text-sky-200"}"
-                  type="button"
-                  data-player-source="${escapeHtml(source.id)}"
-                  aria-pressed="${isActive}"
-                >
+            .map(
+              (source) => `
+                <option value="${escapeHtml(source.id)}" ${source.id === activeSource.id ? "selected" : ""}>
                   ${escapeHtml(source.label)}
-                </button>
-              `;
-            })
+                </option>
+              `,
+            )
             .join("")}
-        </div>
+        </select>
       </div>
     `;
 
-    sourceShell.querySelectorAll("[data-player-source]").forEach((button) => {
-      button.addEventListener("click", () => {
-        state.playerSource = button.getAttribute("data-player-source") || "vidsrc";
+    sourceShell
+      .querySelector("#playerSourceSelect")
+      ?.addEventListener("change", (event) => {
+        state.playerSource = event.target.value || "vidsrc";
         try {
           window.localStorage.setItem(PLAYER_STORAGE_KEY, state.playerSource);
         } catch (error) {
@@ -383,7 +406,6 @@
         }
         renderPlayer();
       });
-    });
   }
 
   function syncWatchHash() {

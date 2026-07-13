@@ -25,6 +25,7 @@
     slideDirection: "left",
     sources: new Set(),
     trending: [],
+    year: null,
   };
 
   const BROWSE_ROWS_PER_BATCH = 5;
@@ -141,39 +142,43 @@
 
   function cardTemplate(item) {
     const poster = item.poster || item.backdrop || imageFallback(item.title);
-    const watchUrl = api().buildWatchUrl(item);
 
     return `
-      <a
-        class="catalog-card group block overflow-hidden rounded-lg border border-blue-900/70 bg-slate-950 outline-none transition hover:-translate-y-1 hover:border-sky-500/70 focus-visible:-translate-y-1 focus-visible:border-sky-500/70 focus-visible:ring-4 focus-visible:ring-sky-400/20"
-        href="${watchUrl}"
-        aria-label="Watch ${escapeHtml(item.title)}"
-      >
-        <div class="relative isolate aspect-[2/3] overflow-hidden">
-          <img
-            class="h-full w-full object-cover transition duration-300 group-hover:scale-105 group-hover:brightness-[0.58] group-focus-visible:scale-105 group-focus-visible:brightness-[0.58]"
-            src="${poster}"
-            alt="${escapeHtml(item.title)} poster"
-            loading="lazy"
-            decoding="async"
-            onerror="this.onerror=null;this.src='${imageFallback(item.title)}';"
-          />
+      <article class="catalog-card group relative overflow-hidden rounded-lg border border-blue-900/70 bg-slate-950 transition duration-300 hover:-translate-y-1 hover:border-sky-500/70 focus-within:-translate-y-1 focus-within:border-sky-500/70">
+        <button
+          class="block w-full text-left outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-sky-400/25"
+          type="button"
+          data-more-info
+          data-media-type="${escapeHtml(item.mediaType)}"
+          data-media-id="${escapeHtml(item.id)}"
+          aria-label="More information about ${escapeHtml(item.title)}"
+        >
+          <div class="relative isolate aspect-[2/3] overflow-hidden">
+            <img
+              class="h-full w-full object-cover transition duration-500 group-hover:scale-105 group-hover:brightness-[0.58] group-focus-within:scale-105 group-focus-within:brightness-[0.58]"
+              src="${poster}"
+              alt="${escapeHtml(item.title)} poster"
+              loading="lazy"
+              decoding="async"
+              onerror="this.onerror=null;this.src='${imageFallback(item.title)}';"
+            />
 
-          <div class="absolute inset-0 flex translate-y-3 flex-col justify-end gap-3 bg-gradient-to-t from-slate-950 via-slate-950/78 to-transparent p-4 opacity-0 transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">
-            <h3 class="text-xl font-black leading-tight text-slate-50">${escapeHtml(item.title)}</h3>
-            <p class="line-clamp-3 text-xs leading-5 text-slate-300 md:line-clamp-4 md:text-sm md:leading-6">${escapeHtml(item.synopsis)}</p>
+            <div class="absolute inset-0 flex translate-y-3 flex-col justify-end gap-3 bg-gradient-to-t from-slate-950 via-slate-950/78 to-transparent p-4 opacity-0 transition duration-300 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+              <h3 class="text-xl font-black leading-tight text-slate-50">${escapeHtml(item.title)}</h3>
+              <p class="line-clamp-3 text-xs leading-5 text-slate-300 md:line-clamp-4 md:text-sm md:leading-6">${escapeHtml(item.synopsis)}</p>
+            </div>
           </div>
-        </div>
 
-        <div class="space-y-2 p-3">
-          <h3 class="truncate text-sm font-black text-slate-50">${escapeHtml(item.title)}</h3>
-          <div class="flex flex-wrap items-center gap-2 text-xs text-slate-300">
-            <span class="rounded-full bg-blue-500/20 px-2 py-1 font-black text-sky-200">${escapeHtml(item.rating)}</span>
-            <span>${escapeHtml(item.year)}</span>
-            <span class="rounded-full bg-sky-400/15 px-2 py-1 font-black uppercase text-sky-300">${api().mediaLabel(item.mediaType)}</span>
+          <div class="space-y-2 p-3">
+            <h3 class="truncate text-sm font-black text-slate-50">${escapeHtml(item.title)}</h3>
+            <div class="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+              <span class="rounded-full bg-blue-500/20 px-2 py-1 font-black text-sky-200">${escapeHtml(item.rating)}</span>
+              <span>${escapeHtml(item.year)}</span>
+              <span class="rounded-full bg-sky-400/15 px-2 py-1 font-black uppercase text-sky-300">${api().mediaLabel(item.mediaType)}</span>
+            </div>
           </div>
-        </div>
-      </a>
+        </button>
+      </article>
     `;
   }
 
@@ -263,18 +268,29 @@
         break;
       }
 
-      const feed = state.genre
-        ? await api().getGenreTitles({
-            slug: state.genreSlug,
-            filter: "all",
-            page: state.browseNextPage,
-            limit: 20,
-          })
-        : await api().getTrending({
-            filter: state.catalogFilter,
-            page: state.browseNextPage,
-            limit: 20,
-          });
+      let feed;
+
+      if (state.genre) {
+        feed = await api().getGenreTitles({
+          slug: state.genreSlug,
+          filter: "all",
+          page: state.browseNextPage,
+          limit: 20,
+        });
+      } else if (state.year) {
+        feed = await api().getYearTitles({
+          year: state.year,
+          filter: "all",
+          page: state.browseNextPage,
+          limit: 20,
+        });
+      } else {
+        feed = await api().getTrending({
+          filter: state.catalogFilter,
+          page: state.browseNextPage,
+          limit: 20,
+        });
+      }
       const items = feed.items || [];
 
       if (feed.source) {
@@ -370,7 +386,7 @@
           <h2 class="max-w-3xl text-4xl font-black leading-none text-slate-50 md:text-6xl">
             ${
               item.logo
-                ? `<img class="title-logo max-h-20 w-auto max-w-[min(28rem,78vw)] object-contain object-left md:max-h-28" src="${item.logo}" alt="${escapeHtml(item.title)}" decoding="async" onerror="this.classList.add('hidden');this.nextElementSibling.classList.remove('hidden');" /><span class="hidden">${escapeHtml(item.title)}</span>`
+                ? `<img class="title-logo max-h-20 w-auto max-w-[min(28rem,78vw)] object-contain object-left md:max-h-28" src="${item.logo}" alt="${escapeHtml(item.title)}" decoding="async" onload="this.nextElementSibling.classList.add('hidden');" onerror="this.classList.add('hidden');" /><span>${escapeHtml(item.title)}</span>`
                 : escapeHtml(item.title)
             }
           </h2>
@@ -379,12 +395,24 @@
             ${escapeHtml(item.synopsis)}
           </p>
 
-          <a
-            class="mt-5 w-fit rounded-lg bg-sky-400 px-5 py-3 text-sm font-black text-slate-950 shadow-xl shadow-sky-500/20 transition hover:bg-sky-300 focus-visible:bg-sky-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-400/25 md:px-6"
-            href="${watchUrl}"
-          >
-            Watch now
-          </a>
+          <div class="mt-5 flex flex-wrap gap-3">
+            <a
+              class="inline-flex items-center gap-2 rounded-lg bg-sky-400 px-5 py-3 text-sm font-black text-slate-950 shadow-xl shadow-sky-500/20 transition duration-200 hover:bg-sky-300 focus-visible:bg-sky-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-400/25 md:px-6"
+              href="${watchUrl}"
+            >
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+              Watch now
+            </a>
+            <button
+              class="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-slate-950/55 px-5 py-3 text-sm font-black text-slate-50 backdrop-blur transition duration-200 hover:border-sky-400/70 hover:bg-slate-950/80 hover:text-sky-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-400/20 md:px-6"
+              type="button"
+              data-more-info
+              data-media-type="${escapeHtml(item.mediaType)}"
+              data-media-id="${escapeHtml(item.id)}"
+            >
+              More info
+            </button>
+          </div>
         </div>
       </article>
     `;
@@ -557,7 +585,9 @@
     const isHome = state.catalogFilter === "all";
     const isMovies = state.catalogFilter === "movie";
     const isGenre = Boolean(state.genre);
+    const isYear = Boolean(state.year);
     const genreName = state.genre?.name || "Genre";
+    const yearLabel = String(state.year || "");
     const hasGenreMovies = Boolean(state.genre?.movieGenreIds.length);
     const hasGenreSeries = Boolean(state.genre?.tvGenreIds.length);
     const page = document.querySelector("#catalogPage");
@@ -567,6 +597,8 @@
       "aria-label",
       isGenre
         ? `${genreName} movies and series`
+        : isYear
+          ? `${yearLabel} movies and series`
         : isHome
           ? "RainFlix home"
           : isMovies
@@ -577,6 +609,8 @@
       "aria-label",
       isGenre
         ? `Featured ${genreName} movies and series`
+        : isYear
+          ? `Featured ${yearLabel} movies and series`
         : isHome || isMovies
           ? "Featured movies"
           : "Featured series",
@@ -585,11 +619,11 @@
     setSectionVisible("#trendingSection", true);
     setSectionVisible(
       "#newestMoviesSection",
-      isGenre ? hasGenreMovies : isHome || isMovies,
+      isGenre ? hasGenreMovies : isYear || isHome || isMovies,
     );
     setSectionVisible(
       "#newestSeriesSection",
-      isGenre ? hasGenreSeries : isHome || !isMovies,
+      isGenre ? hasGenreSeries : isYear || isHome || !isMovies,
     );
     setSectionVisible("#browseSection", true);
 
@@ -597,6 +631,8 @@
       "#trendingTitle",
       isGenre
         ? `Popular ${genreName}`
+        : isYear
+          ? `Popular in ${yearLabel}`
         : isHome
           ? "Trending this week"
           : isMovies
@@ -605,16 +641,26 @@
     );
     setText(
       "#newestMoviesTitle",
-      isGenre ? `Newest ${genreName} movies` : "Newest movies",
+      isGenre
+        ? `Newest ${genreName} movies`
+        : isYear
+          ? `${yearLabel} movies`
+          : "Newest movies",
     );
     setText(
       "#newestSeriesTitle",
-      isGenre ? `Newest ${genreName} series` : "Newest series",
+      isGenre
+        ? `Newest ${genreName} series`
+        : isYear
+          ? `${yearLabel} series`
+          : "Newest series",
     );
     setText(
       "#browseTitle",
       isGenre
         ? `Browse ${genreName}`
+        : isYear
+          ? `Browse ${yearLabel}`
         : isHome
           ? "Browse"
           : isMovies
@@ -666,6 +712,30 @@
               sortBy: "newest",
             })
           : Promise.resolve({ items: [] }),
+      ]);
+      carouselFeed = trendingFeed;
+    } else if (state.year) {
+      [trendingFeed, movieFeed, seriesFeed] = await Promise.all([
+        api().getYearTitles({
+          year: state.year,
+          filter: "all",
+          page: 1,
+          limit: api().PAGE_SIZE,
+        }),
+        api().getYearTitles({
+          year: state.year,
+          filter: "movie",
+          page: 1,
+          limit: api().PAGE_SIZE,
+          sortBy: "newest",
+        }),
+        api().getYearTitles({
+          year: state.year,
+          filter: "tv",
+          page: 1,
+          limit: api().PAGE_SIZE,
+          sortBy: "newest",
+        }),
       ]);
       carouselFeed = trendingFeed;
     } else if (state.catalogFilter === "all") {
@@ -764,6 +834,13 @@
     state.genreSlug =
       context.routeName === "genre" ? context.params?.genre || "" : "";
     state.genre = state.genreSlug ? api().getGenre(state.genreSlug) : null;
+    state.year =
+      context.routeName === "year"
+        ? Math.min(
+            new Date().getFullYear(),
+            Math.max(1900, Number.parseInt(context.params?.year, 10) || 0),
+          ) || null
+        : null;
     state.catalogFilter =
       context.routeName === "movies"
         ? "movie"
@@ -773,6 +850,8 @@
     document.title =
       state.genre
         ? `${state.genre.name} | RainFlix`
+        : state.year
+          ? `${state.year} Movies & Series | RainFlix`
         : state.catalogFilter === "movie"
         ? "Movies | RainFlix"
         : state.catalogFilter === "tv"
