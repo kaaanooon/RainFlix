@@ -243,6 +243,29 @@
   ];
 
   const PAGE_SIZE = 12;
+  const GENRES = [
+    { slug: "action-adventure", name: "Action & Adventure", movieGenreIds: [28, 12], tvGenreIds: [10759] },
+    { slug: "animation", name: "Animation", movieGenreIds: [16], tvGenreIds: [16] },
+    { slug: "comedy", name: "Comedy", movieGenreIds: [35], tvGenreIds: [35] },
+    { slug: "crime", name: "Crime", movieGenreIds: [80], tvGenreIds: [80] },
+    { slug: "documentary", name: "Documentary", movieGenreIds: [99], tvGenreIds: [99] },
+    { slug: "drama", name: "Drama", movieGenreIds: [18], tvGenreIds: [18] },
+    { slug: "family", name: "Family", movieGenreIds: [10751], tvGenreIds: [10751] },
+    { slug: "fantasy-scifi", name: "Fantasy & Sci-Fi", movieGenreIds: [14, 878], tvGenreIds: [10765] },
+    { slug: "history", name: "History", movieGenreIds: [36], tvGenreIds: [] },
+    { slug: "horror", name: "Horror", movieGenreIds: [27], tvGenreIds: [] },
+    { slug: "kids", name: "Kids", movieGenreIds: [10751], tvGenreIds: [10762] },
+    { slug: "music", name: "Music", movieGenreIds: [10402], tvGenreIds: [] },
+    { slug: "mystery", name: "Mystery", movieGenreIds: [9648], tvGenreIds: [9648] },
+    { slug: "news", name: "News", movieGenreIds: [], tvGenreIds: [10763] },
+    { slug: "reality", name: "Reality", movieGenreIds: [], tvGenreIds: [10764] },
+    { slug: "romance-soap", name: "Romance & Soap", movieGenreIds: [10749], tvGenreIds: [10766] },
+    { slug: "talk", name: "Talk", movieGenreIds: [], tvGenreIds: [10767] },
+    { slug: "thriller", name: "Thriller", movieGenreIds: [53], tvGenreIds: [9648] },
+    { slug: "tv-movie", name: "TV Movie", movieGenreIds: [10770], tvGenreIds: [] },
+    { slug: "war-politics", name: "War & Politics", movieGenreIds: [10752], tvGenreIds: [10768] },
+    { slug: "western", name: "Western", movieGenreIds: [37], tvGenreIds: [37] },
+  ];
   const TMDB_CACHE_PREFIX = "rainflix:tmdb:v1:";
   const TITLE_LOGO_CACHE_KEY = "rainflix:title-logos:v1";
   const TITLE_LOGO_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
@@ -668,6 +691,126 @@
     }
   }
 
+  function getGenre(slug) {
+    const cleanSlug = String(slug || "").trim().toLowerCase();
+    return GENRES.find((genre) => genre.slug === cleanSlug) || null;
+  }
+
+  async function getGenreTitles({
+    slug,
+    filter = "all",
+    page = 1,
+    limit = PAGE_SIZE,
+    sortBy = "popularity",
+  } = {}) {
+    const genre = getGenre(slug);
+    const normalizedFilter = filter === "series" ? "tv" : filter;
+    const requestedTypes =
+      normalizedFilter === "movie" || normalizedFilter === "tv"
+        ? [normalizedFilter]
+        : ["movie", "tv"];
+    const mediaTypes = requestedTypes.filter((mediaType) => {
+      const genreIds =
+        mediaType === "movie" ? genre?.movieGenreIds : genre?.tvGenreIds;
+      return genreIds?.length;
+    });
+
+    if (!genre || !mediaTypes.length) {
+      return {
+        items: [],
+        page,
+        totalPages: 1,
+        source: hasTmdbCredentials() ? "tmdb" : "demo",
+      };
+    }
+
+    try {
+      const responses = await Promise.all(
+        mediaTypes.map(async (mediaType) => {
+          const genreIds =
+            mediaType === "movie" ? genre.movieGenreIds : genre.tvGenreIds;
+          const newest = sortBy === "newest";
+          const params = {
+            include_adult: "false",
+            page,
+            sort_by: newest
+              ? mediaType === "movie"
+                ? "primary_release_date.desc"
+                : "first_air_date.desc"
+              : "popularity.desc",
+            "vote_count.gte": 5,
+            with_genres: genreIds.join("|"),
+          };
+
+          if (mediaType === "movie") {
+            params.include_video = "false";
+            params["primary_release_date.lte"] = today();
+            params.region = config().tmdbRegion || "US";
+          } else {
+            params.include_null_first_air_dates = "false";
+            params["first_air_date.lte"] = today();
+          }
+
+          return {
+            data: await tmdbFetch(`discover/${mediaType}`, params),
+            mediaType,
+          };
+        }),
+      );
+
+      if (responses.every(({ data }) => !data)) {
+        return fallbackPage(normalizedFilter, page, limit);
+      }
+
+      const compareItems = (left, right) => {
+        if (sortBy === "newest") {
+          const leftDate = left.release_date || left.first_air_date || "";
+          const rightDate = right.release_date || right.first_air_date || "";
+          return rightDate.localeCompare(leftDate);
+        }
+
+        return (right.popularity || 0) - (left.popularity || 0);
+      };
+      const queues = responses.map(({ data, mediaType }) =>
+        (data?.results || [])
+          .map((item) => ({
+            ...item,
+            media_type: mediaType,
+          }))
+          .filter((item) => item.poster_path || item.backdrop_path)
+          .sort(compareItems),
+      );
+      const selectedItems = [];
+
+      while (
+        selectedItems.length < limit &&
+        queues.some((queue) => queue.length)
+      ) {
+        queues.forEach((queue) => {
+          if (selectedItems.length < limit && queue.length) {
+            selectedItems.push(queue.shift());
+          }
+        });
+      }
+
+      return {
+        items: selectedItems
+          .map((item) => mapTmdbTitle(item, item.media_type))
+          .filter((item) => item.poster || item.backdrop)
+          .slice(0, limit),
+        page,
+        totalPages: Math.min(
+          Math.max(...responses.map(({ data }) => data?.total_pages || 1)),
+          500,
+        ),
+        source: "tmdb",
+      };
+    } catch (error) {
+      console.warn(error);
+      return fallbackPage(normalizedFilter, page, limit);
+    }
+  }
+
   async function getTrendingThisWeek(limit = PAGE_SIZE) {
     try {
       const data = await tmdbFetch("trending/all/week", { page: 1 });
@@ -962,6 +1105,78 @@
     return `${cleanBase}/movie/${encodeURIComponent(id)}`;
   }
 
+  function buildPathPlayerUrl({
+    mediaType,
+    id,
+    season = 1,
+    episode = 1,
+    baseUrl,
+    params = {},
+  }) {
+    const normalizedType = normalizeMediaType(mediaType);
+    const cleanBase = cleanBaseUrl(baseUrl);
+    const cleanSeason = Number.parseInt(season, 10) || 1;
+    const cleanEpisode = Number.parseInt(episode, 10) || 1;
+    const path =
+      normalizedType === "tv"
+        ? `${cleanBase}/tv/${encodeURIComponent(id)}/${cleanSeason}/${cleanEpisode}`
+        : `${cleanBase}/movie/${encodeURIComponent(id)}`;
+
+    return buildUrlWithQuery(path, params);
+  }
+
+  function buildVidFastUrl(options) {
+    const normalizedType = normalizeMediaType(options.mediaType);
+    const params = {
+      autoPlay: "true",
+      theme: "38BDF8",
+      fullscreenButton: "true",
+      sub: "en",
+    };
+
+    if (normalizedType === "tv") {
+      params.nextButton = "true";
+      params.autoNext = "true";
+    }
+
+    return buildPathPlayerUrl({ ...options, params });
+  }
+
+  function buildVidSrcMeUrl({
+    mediaType,
+    id,
+    season = 1,
+    episode = 1,
+    baseUrl,
+  }) {
+    const normalizedType = normalizeMediaType(mediaType);
+    const cleanBase = cleanBaseUrl(baseUrl);
+    const cleanSeason = Number.parseInt(season, 10) || 1;
+    const cleanEpisode = Number.parseInt(episode, 10) || 1;
+    const path =
+      normalizedType === "tv"
+        ? `${cleanBase}/tv/${encodeURIComponent(id)}/${cleanSeason}-${cleanEpisode}`
+        : `${cleanBase}/movie/${encodeURIComponent(id)}`;
+
+    return buildUrlWithQuery(path, {
+      autoplay: 1,
+      autonext: normalizedType === "tv" ? 1 : undefined,
+      ds_lang: "en",
+    });
+  }
+
+  function buildVidCoreUrl(options) {
+    return buildPathPlayerUrl({
+      ...options,
+      params: {
+        autoPlay: "true",
+        theme: "38BDF8",
+        fullscreenButton: "true",
+        sub: "en",
+      },
+    });
+  }
+
   function streamSources(mediaType = "movie") {
     const normalizedType = normalizeMediaType(mediaType);
     const sources = [
@@ -987,6 +1202,28 @@
         id: "vidlink",
         label: "VidLink",
         baseUrl: cleanBaseUrl(config().vidlinkEmbedBaseUrl || "https://vidlink.pro"),
+        mediaTypes: ["movie", "tv"],
+      },
+      {
+        id: "vidfast",
+        label: "VidFast",
+        baseUrl: cleanBaseUrl(config().vidfastEmbedBaseUrl || "https://vidfast.vc"),
+        mediaTypes: ["movie", "tv"],
+      },
+      {
+        id: "vidsrcme",
+        label: "VidSrcMe",
+        baseUrl: cleanBaseUrl(
+          config().vidsrcMeEmbedBaseUrl || "https://vidsrc-embed.ru/embed",
+        ),
+        mediaTypes: ["movie", "tv"],
+      },
+      {
+        id: "vidcore",
+        label: "VidCore",
+        baseUrl: cleanBaseUrl(
+          config().vidcoreEmbedBaseUrl || "https://vidcore.org/embed",
+        ),
         mediaTypes: ["movie", "tv"],
       },
     ];
@@ -1036,6 +1273,36 @@
       });
     }
 
+    if (streamSource.id === "vidfast") {
+      return buildVidFastUrl({
+        mediaType: normalizedType,
+        id,
+        season: cleanSeason,
+        episode: cleanEpisode,
+        baseUrl: streamSource.baseUrl,
+      });
+    }
+
+    if (streamSource.id === "vidsrcme") {
+      return buildVidSrcMeUrl({
+        mediaType: normalizedType,
+        id,
+        season: cleanSeason,
+        episode: cleanEpisode,
+        baseUrl: streamSource.baseUrl,
+      });
+    }
+
+    if (streamSource.id === "vidcore") {
+      return buildVidCoreUrl({
+        mediaType: normalizedType,
+        id,
+        season: cleanSeason,
+        episode: cleanEpisode,
+        baseUrl: streamSource.baseUrl,
+      });
+    }
+
     if (normalizedType === "tv") {
       return `${streamSource.baseUrl}/tv/${encodeURIComponent(id)}/${cleanSeason}/${cleanEpisode}`;
     }
@@ -1051,6 +1318,7 @@
   }
 
   window.RainFlixApi = {
+    GENRES,
     PAGE_SIZE,
     buildStreamSources,
     buildStreamUrl,
@@ -1058,6 +1326,8 @@
     createImageFallback,
     escapeHtml,
     getDetails,
+    getGenre,
+    getGenreTitles,
     getLoaderPosters,
     getNewestMovies,
     getNewestSeries,

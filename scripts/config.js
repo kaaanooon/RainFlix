@@ -12,5 +12,8 @@
     twoEmbedBaseUrl: "https://www.2embed.cc/embed",
     multiEmbedBaseUrl: "https://multiembed.mov",
     vidlinkEmbedBaseUrl: "https://vidlink.pro",
+    vidfastEmbedBaseUrl: "https://vidfast.vc",
+    vidsrcMeEmbedBaseUrl: "https://vidsrc-embed.ru/embed",
+    vidcoreEmbedBaseUrl: "https://vidcore.org/embed",
   };
 })();

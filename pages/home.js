@@ -17,6 +17,8 @@
     carouselStartY: 0,
     carouselTimer: null,
     carouselTransitionTimer: null,
+    genre: null,
+    genreSlug: "",
     newestMovies: [],
     newestSeries: [],
     pendingSlide: 0,
@@ -261,11 +263,18 @@
         break;
       }
 
-      const feed = await api().getTrending({
-        filter: state.catalogFilter,
-        page: state.browseNextPage,
-        limit: 20,
-      });
+      const feed = state.genre
+        ? await api().getGenreTitles({
+            slug: state.genreSlug,
+            filter: "all",
+            page: state.browseNextPage,
+            limit: 20,
+          })
+        : await api().getTrending({
+            filter: state.catalogFilter,
+            page: state.browseNextPage,
+            limit: 20,
+          });
       const items = feed.items || [];
 
       if (feed.source) {
@@ -547,32 +556,70 @@
   function configureHomeSections() {
     const isHome = state.catalogFilter === "all";
     const isMovies = state.catalogFilter === "movie";
+    const isGenre = Boolean(state.genre);
+    const genreName = state.genre?.name || "Genre";
+    const hasGenreMovies = Boolean(state.genre?.movieGenreIds.length);
+    const hasGenreSeries = Boolean(state.genre?.tvGenreIds.length);
     const page = document.querySelector("#catalogPage");
     const carousel = document.querySelector("#trendingCarousel");
 
     page?.setAttribute(
       "aria-label",
-      isHome ? "RainFlix home" : isMovies ? "Movies catalog" : "Series catalog",
+      isGenre
+        ? `${genreName} movies and series`
+        : isHome
+          ? "RainFlix home"
+          : isMovies
+            ? "Movies catalog"
+            : "Series catalog",
     );
     carousel?.setAttribute(
       "aria-label",
-      isHome ? "Featured movies" : isMovies ? "Featured movies" : "Featured series",
+      isGenre
+        ? `Featured ${genreName} movies and series`
+        : isHome || isMovies
+          ? "Featured movies"
+          : "Featured series",
     );
 
     setSectionVisible("#trendingSection", true);
-    setSectionVisible("#newestMoviesSection", isHome || isMovies);
-    setSectionVisible("#newestSeriesSection", isHome || !isMovies);
+    setSectionVisible(
+      "#newestMoviesSection",
+      isGenre ? hasGenreMovies : isHome || isMovies,
+    );
+    setSectionVisible(
+      "#newestSeriesSection",
+      isGenre ? hasGenreSeries : isHome || !isMovies,
+    );
     setSectionVisible("#browseSection", true);
 
     setText(
       "#trendingTitle",
-      isHome ? "Trending this week" : isMovies ? "Trending movies" : "Trending series",
+      isGenre
+        ? `Popular ${genreName}`
+        : isHome
+          ? "Trending this week"
+          : isMovies
+            ? "Trending movies"
+            : "Trending series",
     );
-    setText("#newestMoviesTitle", "Newest movies");
-    setText("#newestSeriesTitle", "Newest series");
+    setText(
+      "#newestMoviesTitle",
+      isGenre ? `Newest ${genreName} movies` : "Newest movies",
+    );
+    setText(
+      "#newestSeriesTitle",
+      isGenre ? `Newest ${genreName} series` : "Newest series",
+    );
     setText(
       "#browseTitle",
-      isHome ? "Browse" : isMovies ? "Browse movies" : "Browse series",
+      isGenre
+        ? `Browse ${genreName}`
+        : isHome
+          ? "Browse"
+          : isMovies
+            ? "Browse movies"
+            : "Browse series",
     );
   }
 
@@ -593,7 +640,35 @@
     let movieFeed = { items: [] };
     let seriesFeed = { items: [] };
 
-    if (state.catalogFilter === "all") {
+    if (state.genre) {
+      [trendingFeed, movieFeed, seriesFeed] = await Promise.all([
+        api().getGenreTitles({
+          slug: state.genreSlug,
+          filter: "all",
+          page: 1,
+          limit: api().PAGE_SIZE,
+        }),
+        state.genre.movieGenreIds.length
+          ? api().getGenreTitles({
+              slug: state.genreSlug,
+              filter: "movie",
+              page: 1,
+              limit: api().PAGE_SIZE,
+              sortBy: "newest",
+            })
+          : Promise.resolve({ items: [] }),
+        state.genre.tvGenreIds.length
+          ? api().getGenreTitles({
+              slug: state.genreSlug,
+              filter: "tv",
+              page: 1,
+              limit: api().PAGE_SIZE,
+              sortBy: "newest",
+            })
+          : Promise.resolve({ items: [] }),
+      ]);
+      carouselFeed = trendingFeed;
+    } else if (state.catalogFilter === "all") {
       [carouselFeed, trendingFeed, movieFeed, seriesFeed] = await Promise.all([
         api().getTrendingMovies(api().PAGE_SIZE),
         api().getTrendingThisWeek(api().PAGE_SIZE),
@@ -686,6 +761,9 @@
   }
 
   window.initHomePage = function initHomePage(context = {}) {
+    state.genreSlug =
+      context.routeName === "genre" ? context.params?.genre || "" : "";
+    state.genre = state.genreSlug ? api().getGenre(state.genreSlug) : null;
     state.catalogFilter =
       context.routeName === "movies"
         ? "movie"
@@ -693,7 +771,9 @@
           ? "tv"
           : "all";
     document.title =
-      state.catalogFilter === "movie"
+      state.genre
+        ? `${state.genre.name} | RainFlix`
+        : state.catalogFilter === "movie"
         ? "Movies | RainFlix"
         : state.catalogFilter === "tv"
           ? "Series | RainFlix"

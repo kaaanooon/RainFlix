@@ -8,10 +8,36 @@
       <img class="h-7 w-auto object-contain md:h-8" src="./assets/rainflix-wordmark.png" alt="RainFlix" draggable="false" />
     </a>
 
-    <nav class="hidden items-center gap-1 md:flex" aria-label="Primary navigation">
+    <nav class="relative hidden items-center gap-1 md:flex" aria-label="Primary navigation">
       <a class="rounded-lg px-3 py-2 text-sm font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#home" data-nav-route="home">Home</a>
       <a class="rounded-lg px-3 py-2 text-sm font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#movies" data-nav-route="movies">Movies</a>
       <a class="rounded-lg px-3 py-2 text-sm font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#series" data-nav-route="series">Series</a>
+      <div id="desktopGenreMenu" class="genre-menu">
+        <button
+          id="desktopGenreToggle"
+          class="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+          type="button"
+          data-nav-route="genre"
+          aria-haspopup="menu"
+          aria-controls="desktopGenreDropdown"
+          aria-expanded="false"
+        >
+          Genres
+          <span class="text-xs" aria-hidden="true">&#9662;</span>
+        </button>
+        <div
+          id="desktopGenreDropdown"
+          class="genre-dropdown absolute left-0 top-full z-[220] w-[min(34rem,calc(100vw-3rem))] pt-2"
+          aria-hidden="true"
+        >
+          <div
+            id="desktopGenreList"
+            class="grid max-h-[28rem] grid-cols-3 gap-1 overflow-y-auto rounded-lg border border-blue-900/80 bg-slate-950/95 p-3 shadow-2xl shadow-black/45 backdrop-blur-xl"
+            role="menu"
+            aria-label="Browse genres"
+          ></div>
+        </div>
+      </div>
     </nav>
 
     <div class="relative ml-auto min-w-0 flex-1 md:max-w-md">
@@ -57,7 +83,7 @@
 
   <div id="mobileNavLayer" class="hidden md:hidden" aria-hidden="true">
     <button id="mobileNavBackdrop" class="fixed inset-0 z-[300] cursor-default bg-black/80" type="button" aria-label="Close navigation"></button>
-    <aside class="fixed inset-y-0 left-0 z-[310] w-[min(18rem,82vw)] border-r border-blue-900/70 bg-slate-950 p-5 shadow-2xl shadow-black/60" aria-label="Mobile navigation">
+    <aside class="fixed inset-y-0 left-0 z-[310] w-[min(18rem,82vw)] overflow-y-auto border-r border-blue-900/70 bg-slate-950 p-5 shadow-2xl shadow-black/60" aria-label="Mobile navigation">
       <div class="flex items-center justify-between border-b border-blue-950/80 pb-5">
         <a class="inline-flex items-center text-slate-50" href="#home" aria-label="RainFlix home">
           <img class="h-8 w-auto object-contain" src="./assets/rainflix-wordmark.png" alt="RainFlix" draggable="false" />
@@ -71,6 +97,24 @@
         <a class="rounded-lg px-4 py-3 text-base font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#home" data-nav-route="home">Home</a>
         <a class="rounded-lg px-4 py-3 text-base font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#movies" data-nav-route="movies">Movies</a>
         <a class="rounded-lg px-4 py-3 text-base font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400" href="#series" data-nav-route="series">Series</a>
+        <div class="mt-2 border-t border-blue-950/80 pt-2">
+          <button
+            id="mobileGenreToggle"
+            class="flex w-full items-center justify-between rounded-lg px-4 py-3 text-left text-base font-bold text-slate-400 transition hover:bg-white/5 hover:text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+            type="button"
+            data-nav-route="genre"
+            aria-controls="mobileGenreList"
+            aria-expanded="false"
+          >
+            Genres
+            <span class="text-xs transition" data-mobile-genre-arrow aria-hidden="true">&#9662;</span>
+          </button>
+          <div
+            id="mobileGenreList"
+            class="mt-1 hidden grid grid-cols-2 gap-1 pb-2"
+            aria-hidden="true"
+          ></div>
+        </div>
       </nav>
     </aside>
   </div>

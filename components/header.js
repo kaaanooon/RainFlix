@@ -7,6 +7,7 @@
   let mobileNavKeyHandler;
   let activeSearchRequest = 0;
   let debounceTimer;
+  let genreFocusTimer;
 
   function setMobileNavOpen(isOpen, returnFocus = false) {
     const layer = document.querySelector("#mobileNavLayer");
@@ -28,6 +29,27 @@
     }
   }
 
+  function setDesktopGenreOpen(isOpen) {
+    const menu = document.querySelector("#desktopGenreMenu");
+    const toggle = document.querySelector("#desktopGenreToggle");
+    const dropdown = document.querySelector("#desktopGenreDropdown");
+
+    menu?.classList.toggle("is-open", isOpen);
+    toggle?.setAttribute("aria-expanded", String(isOpen));
+    dropdown?.setAttribute("aria-hidden", String(!isOpen));
+  }
+
+  function setMobileGenreOpen(isOpen) {
+    const list = document.querySelector("#mobileGenreList");
+    const toggle = document.querySelector("#mobileGenreToggle");
+    const arrow = document.querySelector("[data-mobile-genre-arrow]");
+
+    list?.classList.toggle("hidden", !isOpen);
+    list?.setAttribute("aria-hidden", String(!isOpen));
+    toggle?.setAttribute("aria-expanded", String(isOpen));
+    arrow?.classList.toggle("rotate-180", isOpen);
+  }
+
   window.updateHeaderRoute = function updateHeaderRoute(routeName, params = {}) {
     let activeRoute = routeName;
 
@@ -47,6 +69,23 @@
         link.removeAttribute("aria-current");
       }
     });
+
+    document.querySelectorAll("[data-genre-slug]").forEach((link) => {
+      const isActive =
+        routeName === "genre" &&
+        link.getAttribute("data-genre-slug") === params.genre;
+      link.classList.toggle("bg-sky-400/15", isActive);
+      link.classList.toggle("text-sky-300", isActive);
+      link.classList.toggle("text-slate-300", !isActive);
+
+      if (isActive) {
+        link.setAttribute("aria-current", "page");
+      } else {
+        link.removeAttribute("aria-current");
+      }
+    });
+
+    setMobileGenreOpen(routeName === "genre");
   };
 
   function searchGhostRows() {
@@ -71,6 +110,45 @@
     return window.RainFlixApi?.createImageFallback
       ? window.RainFlixApi.createImageFallback(title)
       : "";
+  }
+
+  function renderGenreMenus() {
+    const genres = window.RainFlixApi?.GENRES || [];
+    const desktopList = document.querySelector("#desktopGenreList");
+    const mobileList = document.querySelector("#mobileGenreList");
+
+    if (desktopList) {
+      desktopList.innerHTML = genres
+        .map(
+          (genre) => `
+            <a
+              class="rounded-lg px-3 py-2 text-sm font-bold text-slate-300 transition hover:bg-sky-400/10 hover:text-sky-200 focus-visible:bg-sky-400/10 focus-visible:text-sky-200 focus-visible:outline-none"
+              href="#genre/${encodeURIComponent(genre.slug)}"
+              data-genre-slug="${escapeHtml(genre.slug)}"
+              role="menuitem"
+            >
+              ${escapeHtml(genre.name)}
+            </a>
+          `,
+        )
+        .join("");
+    }
+
+    if (mobileList) {
+      mobileList.innerHTML = genres
+        .map(
+          (genre) => `
+            <a
+              class="rounded-lg px-3 py-2 text-sm font-bold text-slate-300 transition hover:bg-sky-400/10 hover:text-sky-200 focus-visible:bg-sky-400/10 focus-visible:text-sky-200 focus-visible:outline-none"
+              href="#genre/${encodeURIComponent(genre.slug)}"
+              data-genre-slug="${escapeHtml(genre.slug)}"
+            >
+              ${escapeHtml(genre.name)}
+            </a>
+          `,
+        )
+        .join("");
+    }
   }
 
   function setDropdownContent(html) {
@@ -151,7 +229,12 @@
   }
 
   window.initHeader = function initHeader() {
+    renderGenreMenus();
+
     const searchInput = document.querySelector("#globalSearch");
+    const desktopGenreMenu = document.querySelector("#desktopGenreMenu");
+    const desktopGenreToggle = document.querySelector("#desktopGenreToggle");
+    const mobileGenreToggle = document.querySelector("#mobileGenreToggle");
     const mobileNavLayer = document.querySelector("#mobileNavLayer");
     const mobileNavToggle = document.querySelector("#mobileNavToggle");
     const mobileNavClose = document.querySelector("#mobileNavClose");
@@ -237,6 +320,10 @@
       if (!event.target.closest("#searchDropdown") && event.target !== searchInput) {
         hideDropdown();
       }
+
+      if (!event.target.closest("#desktopGenreMenu")) {
+        setDesktopGenreOpen(false);
+      }
     };
 
     document.addEventListener("click", blurHandler);
@@ -287,7 +374,39 @@
       .querySelector("#searchDropdown")
       ?.addEventListener("keydown", resultKeyHandler);
 
+    desktopGenreMenu?.addEventListener("pointerenter", () => {
+      setDesktopGenreOpen(true);
+    });
+    desktopGenreMenu?.addEventListener("pointerleave", () => {
+      if (!desktopGenreMenu.contains(document.activeElement)) {
+        setDesktopGenreOpen(false);
+      }
+    });
+    desktopGenreMenu?.addEventListener("focusin", () => {
+      window.clearTimeout(genreFocusTimer);
+      setDesktopGenreOpen(true);
+    });
+    desktopGenreMenu?.addEventListener("focusout", () => {
+      window.clearTimeout(genreFocusTimer);
+      genreFocusTimer = window.setTimeout(() => {
+        if (!desktopGenreMenu.contains(document.activeElement)) {
+          setDesktopGenreOpen(false);
+        }
+      });
+    });
+    desktopGenreToggle?.addEventListener("click", () => {
+      setDesktopGenreOpen(true);
+    });
+    document
+      .querySelector("#desktopGenreList")
+      ?.addEventListener("click", () => setDesktopGenreOpen(false));
+
     mobileNavToggle?.addEventListener("click", () => setMobileNavOpen(true));
+    mobileGenreToggle?.addEventListener("click", () => {
+      setMobileGenreOpen(
+        mobileGenreToggle.getAttribute("aria-expanded") !== "true",
+      );
+    });
     mobileNavClose?.addEventListener("click", () => setMobileNavOpen(false, true));
     mobileNavBackdrop?.addEventListener("click", () => setMobileNavOpen(false, true));
     document.querySelector("#mobileNavLayer")?.addEventListener("click", (event) => {
@@ -297,6 +416,17 @@
     });
 
     mobileNavKeyHandler = (event) => {
+      if (
+        event.key === "Escape" &&
+        document.querySelector("#desktopGenreToggle")?.getAttribute(
+          "aria-expanded",
+        ) === "true"
+      ) {
+        setDesktopGenreOpen(false);
+        desktopGenreToggle?.blur();
+        return;
+      }
+
       if (
         event.key === "Escape" &&
         document.querySelector("#mobileNavToggle")?.getAttribute("aria-expanded") ===

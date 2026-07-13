@@ -180,6 +180,49 @@
     `;
   }
 
+  function currentFullscreenElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement || null;
+  }
+
+  function syncFullscreenButton() {
+    const frame = document.querySelector("[data-player-frame]");
+    const button = document.querySelector("[data-player-fullscreen]");
+
+    if (!frame || !button) {
+      return;
+    }
+
+    const isFullscreen = currentFullscreenElement() === frame;
+    const label = isFullscreen ? "Exit fullscreen" : "Enter fullscreen";
+    button.setAttribute("aria-label", label);
+    button.setAttribute("title", label);
+    button.setAttribute("aria-pressed", String(isFullscreen));
+  }
+
+  async function togglePlayerFullscreen() {
+    const frame = document.querySelector("[data-player-frame]");
+
+    if (!frame) {
+      return;
+    }
+
+    try {
+      if (currentFullscreenElement()) {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+      } else if (frame.requestFullscreen) {
+        await frame.requestFullscreen();
+      } else if (frame.webkitRequestFullscreen) {
+        frame.webkitRequestFullscreen();
+      }
+    } catch (error) {
+      // Providers can still expose their own fullscreen control.
+    }
+  }
+
   function renderPlayer() {
     const shell = document.querySelector("#playerShell");
     const sourceShell = document.querySelector("#playerSourceShell");
@@ -211,16 +254,29 @@
     state.playerSource = activeSource.id;
 
     shell.innerHTML = `
-      <div class="relative aspect-video w-full overflow-hidden bg-black">
+      <div class="player-frame relative aspect-video w-full overflow-hidden bg-black" data-player-frame>
         <div class="absolute inset-0 grid place-items-center bg-slate-950" data-player-loading aria-hidden="true">
           <div class="h-8 w-8 animate-spin rounded-full border-2 border-blue-950 border-t-sky-400"></div>
         </div>
+        <button
+          class="absolute right-3 top-3 z-20 grid h-10 w-10 place-items-center rounded-lg border border-white/15 bg-black/70 text-xl text-white shadow-xl backdrop-blur transition hover:bg-black/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+          type="button"
+          data-player-fullscreen
+          aria-label="Enter fullscreen"
+          aria-pressed="false"
+          title="Enter fullscreen"
+        >
+          <span aria-hidden="true">&#x26F6;</span>
+        </button>
         <iframe
           class="absolute inset-0 h-full w-full bg-black"
           src="${escapeHtml(activeSource.url)}"
           title="${escapeHtml(details.title)} ${escapeHtml(activeSource.label)} player"
-          allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-          allowfullscreen
+          allow="autoplay *; encrypted-media *; fullscreen *; picture-in-picture *"
+          allowfullscreen="true"
+          webkitallowfullscreen="true"
+          mozallowfullscreen="true"
+          frameborder="0"
           loading="eager"
           referrerpolicy="origin"
         ></iframe>
@@ -230,6 +286,10 @@
     shell.querySelector("iframe")?.addEventListener("load", () => {
       shell.querySelector("[data-player-loading]")?.classList.add("hidden");
     });
+    shell
+      .querySelector("[data-player-fullscreen]")
+      ?.addEventListener("click", togglePlayerFullscreen);
+    syncFullscreenButton();
 
     sourceShell.innerHTML = `
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -451,4 +511,7 @@
     renderEpisodeSection();
     showContent();
   };
+
+  document.addEventListener("fullscreenchange", syncFullscreenButton);
+  document.addEventListener("webkitfullscreenchange", syncFullscreenButton);
 })();
